@@ -17,7 +17,7 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { collection, addDoc, doc } from "firebase/firestore";
+import { doc, setDoc } from "firebase/firestore";
 import type { Worker } from "@/lib/types";
 
 
@@ -85,17 +85,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Refresh user to get displayName
     const updatedFirebaseUser = auth.currentUser;
 
-    if (role === 'assembler') {
-        const workerRef = doc(collection(db, "workers"));
+    if (role === 'assembler' && updatedFirebaseUser) {
+        const workerRef = doc(db, "workers", updatedFirebaseUser.uid);
         const newWorker: Worker = {
-            id: workerRef.id,
+            id: updatedFirebaseUser.uid,
             name: fullName,
+            email: email,
             avatarUrl: `https://i.pravatar.cc/150?u=${email}`,
             skills: ['New Recruit'],
             availability: 'Pending',
             pastPerformance: 0,
+            timeLoggedSeconds: 0,
         };
-        await addDoc(collection(db, "workers"), newWorker);
+        await setDoc(workerRef, newWorker);
     }
 
     if(updatedFirebaseUser?.email) {
