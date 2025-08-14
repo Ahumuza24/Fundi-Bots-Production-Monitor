@@ -49,8 +49,7 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard" passHref>
             <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
-              <LayoutDashboard />
-              Dashboard
+                <a><LayoutDashboard /><span>Dashboard</span></a>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
@@ -58,8 +57,7 @@ const NavLinks = () => {
            <SidebarMenuItem>
              <Link href="/dashboard/projects" passHref>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
-                <GanttChartSquare />
-                Projects
+                <a><GanttChartSquare /><span>Projects</span></a>
               </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -68,8 +66,7 @@ const NavLinks = () => {
             <SidebarMenuItem>
               <Link href="/dashboard/work-sessions" passHref>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
-                  <Package />
-                  Work Sessions
+                  <a><Package /><span>Work Sessions</span></a>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -78,8 +75,7 @@ const NavLinks = () => {
            <SidebarMenuItem>
             <Link href="/dashboard/ai-optimizer" passHref>
              <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
-              <Cpu />
-              AI Optimizer
+              <a><Cpu /><span>AI Optimizer</span></a>
             </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -87,8 +83,7 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard/notifications" passHref>
            <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
-            <Bell />
-            Notifications
+            <a><Bell /><span>Notifications</span></a>
           </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
