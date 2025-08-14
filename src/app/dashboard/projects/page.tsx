@@ -3,13 +3,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import Image from "next/image"
 import { MoreHorizontal } from "lucide-react"
-import { collection, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { Project } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import {
   Card,
   CardContent,
@@ -23,6 +34,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -45,9 +60,10 @@ import { format } from "date-fns"
 import { Skeleton } from '@/components/ui/skeleton';
 
 function getProjectProgress(project: Project) {
-  const total = project.components.reduce((sum, c) => sum + c.quantityRequired, 0);
+  if (!project.components || project.components.length === 0) return 0;
+  const total = project.components.reduce((sum, c) => sum + (c.quantityRequired || 0), 0);
   if (total === 0) return 0;
-  const completed = project.components.reduce((sum, c) => sum + c.quantityCompleted, 0);
+  const completed = project.components.reduce((sum, c) => sum + (c.quantityCompleted || 0), 0);
   return (completed / total) * 100;
 }
 
@@ -57,42 +73,82 @@ export default function ProjectsPage() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState('all');
 
-  const fetchProjects = useCallback(async () => {
+  const fetchProjects = useCallback(() => {
     setLoading(true);
-    try {
-      const projectsCollection = collection(db, "projects");
-      const projectsSnapshot = await getDocs(projectsCollection);
-      const projectsData = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+    const projectsCollection = collection(db, "projects");
+    const unsubscribe = onSnapshot(projectsCollection, (snapshot) => {
+      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
-    } catch (error) {
+      setLoading(false);
+    }, (error) => {
       console.error("Error fetching projects: ", error);
       toast({
         variant: "destructive",
         title: "Error",
         description: "Could not fetch projects from Firestore.",
       });
-    } finally {
       setLoading(false);
-    }
+    });
+
+    return unsubscribe;
   }, [toast]);
 
   useEffect(() => {
-    fetchProjects();
+    const unsubscribe = fetchProjects();
+    return () => unsubscribe();
   }, [fetchProjects]);
+
+  const handleStatusChange = async (projectId: string, status: Project['status']) => {
+    const projectRef = doc(db, 'projects', projectId);
+    try {
+      await updateDoc(projectRef, { status });
+      toast({
+        title: "Status Updated",
+        description: `Project status changed to ${status}.`,
+      });
+    } catch (error) {
+      console.error("Error updating status: ", error);
+      toast({
+        variant: 'destructive',
+        title: "Error",
+        description: "Could not update project status.",
+      });
+    }
+  };
+
+  const handleDeleteProject = async (projectId: string) => {
+    const projectRef = doc(db, 'projects', projectId);
+    try {
+      await deleteDoc(projectRef);
+      toast({
+        title: "Project Deleted",
+        description: "The project has been successfully deleted.",
+      });
+    } catch (error) {
+      console.error("Error deleting project: ", error);
+      toast({
+        variant: 'destructive',
+        title: "Error",
+        description: "Could not delete project.",
+      });
+    }
+  };
   
   const filteredProjects = projects.filter(project => {
     if (activeTab === 'all') return true;
     if (activeTab === 'in-progress') return project.status === 'In Progress';
     if (activeTab === 'completed') return project.status === 'Completed';
     if (activeTab === 'on-hold') return project.status === 'On Hold';
+    if (activeTab === 'not-started') return project.status === 'Not Started';
     return false;
   }).sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
 
   return (
-    <Tabs defaultValue="all" onValueChange={setActiveTab}>
+    <Tabs defaultValue="all" onValueChange={setActiveTab} value={activeTab}>
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="not-started">Not Started</TabsTrigger>
           <TabsTrigger value="in-progress">In Progress</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
           <TabsTrigger value="on-hold" className="hidden sm:flex">
@@ -100,7 +156,7 @@ export default function ProjectsPage() {
           </TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
-          <CreateProjectDialog onProjectCreated={fetchProjects} />
+          <CreateProjectDialog onProjectCreated={() => {}} />
         </div>
       </div>
       <TabsContent value={activeTab}>
@@ -108,7 +164,7 @@ export default function ProjectsPage() {
           <CardHeader>
             <CardTitle>Projects</CardTitle>
             <CardDescription>
-              Manage your projects and view their progress.
+              Manage your projects and view their progress. Updates are shown in real-time.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -163,7 +219,8 @@ export default function ProjectsPage() {
                         <Badge variant={project.status === "Completed" ? "default" : "outline"} className={
                           project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
                           project.status === 'On Hold' ? 'bg-yellow-100 text-yellow-800' :
-                          project.status === 'Completed' ? 'bg-green-100 text-green-800' : ''
+                          project.status === 'Completed' ? 'bg-green-100 text-green-800' : 
+                          project.status === 'Not Started' ? 'bg-gray-100 text-gray-800' : ''
                         }>{project.status}</Badge>
                       </TableCell>
                       <TableCell>
@@ -189,11 +246,44 @@ export default function ProjectsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>View Details</DropdownMenuItem>
-                            <DropdownMenuItem className="text-destructive">
-                              Delete
-                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit</DropdownMenuItem>
+                            <DropdownMenuSub>
+                              <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                              <DropdownMenuSubContent>
+                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Not Started')}>Not Started</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'In Progress')}>In Progress</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'On Hold')}>On Hold</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Completed')}>Completed</DropdownMenuItem>
+                              </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                            <DropdownMenuSeparator />
+                             <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onSelect={(e) => e.preventDefault()}
+                                >
+                                  Delete
+                                </DropdownMenuItem>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the project "{project.name}".
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    className="bg-destructive hover:bg-destructive/90"
+                                    onClick={() => handleDeleteProject(project.id)}
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           </DropdownMenuContent>
                         </DropdownMenu>
                       </TableCell>
