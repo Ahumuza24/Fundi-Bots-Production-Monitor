@@ -47,7 +47,7 @@ const NavLinks = () => {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <Link href="/dashboard" passHref>
+          <Link href="/dashboard" passHref legacyBehavior>
             <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
               <a>
                 <LayoutDashboard />
@@ -58,7 +58,7 @@ const NavLinks = () => {
         </SidebarMenuItem>
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-             <Link href="/dashboard/projects" passHref>
+             <Link href="/dashboard/projects" passHref legacyBehavior>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
                 <a>
                   <GanttChartSquare />
@@ -70,7 +70,7 @@ const NavLinks = () => {
         )}
         {user?.role === 'assembler' && (
             <SidebarMenuItem>
-              <Link href="/dashboard/work-sessions" passHref>
+              <Link href="/dashboard/work-sessions" passHref legacyBehavior>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
                   <a>
                     <Package />
@@ -82,7 +82,7 @@ const NavLinks = () => {
         )}
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-            <Link href="/dashboard/ai-optimizer" passHref>
+            <Link href="/dashboard/ai-optimizer" passHref legacyBehavior>
              <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
               <a>
                 <Cpu />
@@ -93,7 +93,7 @@ const NavLinks = () => {
            </SidebarMenuItem>
         )}
         <SidebarMenuItem>
-          <Link href="/dashboard/notifications" passHref>
+          <Link href="/dashboard/notifications" passHref legacyBehavior>
            <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
             <a>
               <Bell />
