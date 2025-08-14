@@ -1,23 +1,66 @@
+
 "use client";
 
-import React, { useState, useTransition } from 'react';
+import React, { useState, useTransition, useEffect } from 'react';
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from '@/lib/firebase';
+import type { Project, Worker } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, Lightbulb, UserCheck, AlertCircle } from 'lucide-react';
-import { projects, workers } from '@/lib/mock-data';
 import { suggestProjectPriority, ProjectPriorityOutput } from '@/ai/flows/project-priority-suggestions';
 import { matchWorkerToProject, MatchWorkerToProjectOutput } from '@/ai/flows/worker-project-matching';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Skeleton } from '../ui/skeleton';
+
+function useFirestoreCollection<T>(collectionName: string) {
+  const [data, setData] = useState<T[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
+      const collectionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      setData(collectionData);
+      setLoading(false);
+    }, (error) => {
+      console.error(`Error fetching ${collectionName}: `, error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Could not fetch ${collectionName} data.`,
+      });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [collectionName, toast]);
+
+  return { data, loading };
+}
+
 
 export function ProjectPrioritizer() {
   const [isPending, startTransition] = useTransition();
   const [result, setResult] = useState<ProjectPriorityOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  const { data: projects, loading: projectsLoading } = useFirestoreCollection<Project>('projects');
+  const { data: workers, loading: workersLoading } = useFirestoreCollection<Worker>('workers');
 
   const handleSuggestPriority = () => {
+    if (!projects.length || !workers.length) {
+      toast({
+        variant: 'destructive',
+        title: 'Not Enough Data',
+        description: 'There must be at least one project and one worker to generate suggestions.',
+      });
+      return;
+    }
     startTransition(async () => {
       setError(null);
       setResult(null);
@@ -60,7 +103,7 @@ export function ProjectPrioritizer() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <Button onClick={handleSuggestPriority} disabled={isPending}>
+          <Button onClick={handleSuggestPriority} disabled={isPending || projectsLoading || workersLoading}>
             {isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -110,6 +153,9 @@ export function WorkerMatcher() {
   const [result, setResult] = useState<MatchWorkerToProjectOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  
+  const { data: projects, loading: projectsLoading } = useFirestoreCollection<Project>('projects');
+  const { data: workers, loading: workersLoading } = useFirestoreCollection<Worker>('workers');
 
   const handleMatchWorker = () => {
     if (!selectedProjectId) {
@@ -117,6 +163,14 @@ export function WorkerMatcher() {
         variant: 'destructive',
         title: "No Project Selected",
         description: "Please select a project to find a worker for.",
+      });
+      return;
+    }
+     if (!workers.length) {
+      toast({
+        variant: 'destructive',
+        title: 'No Workers Available',
+        description: 'There are no workers in the database to match.',
       });
       return;
     }
@@ -128,11 +182,14 @@ export function WorkerMatcher() {
         const project = projects.find(p => p.id === selectedProjectId);
         if (!project) throw new Error("Project not found");
 
+        // Simple skill extraction from description, can be improved.
+        const requiredSkills = project.description.toLowerCase().includes("solder") ? ['Soldering'] : ['Final Assembly'];
+
         const input = {
           projectId: project.id,
           projectDescription: project.description,
           projectDeadline: project.deadline,
-          skillsRequired: ['Soldering', 'Final Assembly'], // Example skills
+          skillsRequired: requiredSkills,
           workerPool: workers.map(w => ({
             workerId: w.id,
             skills: w.skills,
@@ -171,30 +228,37 @@ export function WorkerMatcher() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          <div className="flex gap-2">
-            <Select onValueChange={setSelectedProjectId} value={selectedProjectId}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    {project.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button onClick={handleMatchWorker} disabled={isPending || !selectedProjectId}>
-              {isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Matching...
-                </>
-              ) : (
-                "Find Best Worker"
-              )}
-            </Button>
-          </div>
+          {projectsLoading ? (
+            <div className="flex gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-40" />
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Select onValueChange={setSelectedProjectId} value={selectedProjectId} disabled={isPending}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id} value={project.id}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button onClick={handleMatchWorker} disabled={isPending || !selectedProjectId || workersLoading}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Matching...
+                  </>
+                ) : (
+                  "Find Best Worker"
+                )}
+              </Button>
+            </div>
+          )}
 
           {error && (
             <Alert variant="destructive">
@@ -221,3 +285,5 @@ export function WorkerMatcher() {
     </Card>
   );
 }
+
+    

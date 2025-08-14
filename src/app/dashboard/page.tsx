@@ -53,6 +53,7 @@ export default function Dashboard() {
     const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching projects: ", error);
        toast({
@@ -60,11 +61,13 @@ export default function Dashboard() {
           title: "Error",
           description: "Could not fetch projects from Firestore.",
         });
+       setLoading(false);
     });
 
     const workersUnsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
       const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setWorkers(workersData);
+      setLoading(false);
     }, (error) => {
       console.error("Error fetching workers: ", error);
       toast({
@@ -72,11 +75,8 @@ export default function Dashboard() {
         title: "Error",
         description: "Could not fetch workers from Firestore.",
       });
+      setLoading(false);
     });
-
-    // Set loading to false once both have been fetched at least once
-    // A more robust solution might use Promise.all with getDocs for initial load
-    setLoading(false);
 
     return () => {
       projectsUnsubscribe();
@@ -85,24 +85,31 @@ export default function Dashboard() {
   }, [toast]);
   
   const handleSeedData = async () => {
+    setLoading(true);
     try {
       const batch = writeBatch(db);
 
+      // Clear existing data (optional, but good for a clean seed)
+      const existingProjects = await getDocs(collection(db, "projects"));
+      existingProjects.forEach(doc => batch.delete(doc.ref));
+      const existingWorkers = await getDocs(collection(db, "workers"));
+      existingWorkers.forEach(doc => batch.delete(doc.ref));
+
       mockProjects.forEach(project => {
-        const projectRef = doc(db, "projects", project.id);
-        batch.set(projectRef, project);
+        const projectRef = doc(collection(db, "projects"));
+        batch.set(projectRef, { ...project, id: projectRef.id });
       });
       
       mockWorkers.forEach(worker => {
-        const workerRef = doc(db, "workers", worker.id);
-        batch.set(workerRef, worker);
+        const workerRef = doc(collection(db, "workers"));
+        batch.set(workerRef, { ...worker, id: workerRef.id });
       });
       
       await batch.commit();
       
       toast({
         title: "Success",
-        description: "Mock data has been seeded to Firestore.",
+        description: "Sample data has been seeded to Firestore.",
       });
       // Data will refresh via onSnapshot listeners
       
@@ -113,6 +120,8 @@ export default function Dashboard() {
         title: "Error Seeding Data",
         description: "Could not write mock data to Firestore.",
       });
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -130,7 +139,7 @@ export default function Dashboard() {
   
   const recentAssemblers = workers.slice(0, 4);
 
-  if (loading) {
+  if (loading && projects.length === 0 && workers.length === 0) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -205,8 +214,8 @@ export default function Dashboard() {
                   </CardDescription>
               </CardHeader>
               <CardContent>
-                  <Button onClick={handleSeedData}>
-                      <Database className="mr-2 h-4 w-4" />
+                  <Button onClick={handleSeedData} disabled={loading}>
+                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
                       Seed Sample Data
                   </Button>
               </CardContent>
@@ -290,10 +299,12 @@ export default function Dashboard() {
                 ))}
               </TableBody>
             </Table>
-             ) : <p>No assembler data available.</p>}
+             ) : <p className="text-sm text-muted-foreground">No assembler data available. Seed data or add assemblers manually.</p>}
           </CardContent>
         </Card>
       </div>
     </>
   )
 }
+
+    
