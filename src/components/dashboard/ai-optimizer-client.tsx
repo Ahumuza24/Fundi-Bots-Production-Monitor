@@ -8,9 +8,10 @@ import type { Project, Worker } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, Lightbulb, UserCheck, AlertCircle } from 'lucide-react';
+import { Loader2, Lightbulb, UserCheck, AlertCircle, BarChart2 } from 'lucide-react';
 import { suggestProjectPriority, ProjectPriorityOutput } from '@/ai/flows/project-priority-suggestions';
 import { matchWorkerToProject, MatchWorkerToProjectOutput } from '@/ai/flows/worker-project-matching';
+import { compareProjects, CompareProjectsOutput } from '@/ai/flows/project-comparison';
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '../ui/skeleton';
@@ -286,4 +287,152 @@ export function WorkerMatcher() {
   );
 }
 
-    
+
+export function ProjectComparer() {
+  const [isPending, startTransition] = useTransition();
+  const [projectOneId, setProjectOneId] = useState<string>('');
+  const [projectTwoId, setProjectTwoId] = useState<string>('');
+  const [result, setResult] = useState<CompareProjectsOutput | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const { toast } = useToast();
+  
+  const { data: projects, loading: projectsLoading } = useFirestoreCollection<Project>('projects');
+  
+  const handleCompareProjects = () => {
+    if (!projectOneId || !projectTwoId) {
+      toast({
+        variant: 'destructive',
+        title: "Selection Incomplete",
+        description: "Please select two projects to compare.",
+      });
+      return;
+    }
+     if (projectOneId === projectTwoId) {
+      toast({
+        variant: 'destructive',
+        title: 'Invalid Selection',
+        description: 'Please select two different projects to compare.',
+      });
+      return;
+    }
+
+    startTransition(async () => {
+      setError(null);
+      setResult(null);
+      try {
+        const projectOne = projects.find(p => p.id === projectOneId);
+        const projectTwo = projects.find(p => p.id === projectTwoId);
+        if (!projectOne || !projectTwo) throw new Error("One or both projects not found");
+
+        const input = {
+          projectOne: {
+            name: projectOne.name,
+            deadline: projectOne.deadline,
+            status: projectOne.status,
+            progress: projectOne.components.reduce((acc, c) => acc + c.quantityCompleted, 0) / projectOne.components.reduce((acc, c) => acc + c.quantityRequired, 0) || 0,
+          },
+          projectTwo: {
+            name: projectTwo.name,
+            deadline: projectTwo.deadline,
+            status: projectTwo.status,
+            progress: projectTwo.components.reduce((acc, c) => acc + c.quantityCompleted, 0) / projectTwo.components.reduce((acc, c) => acc + c.quantityRequired, 0) || 0,
+          },
+        };
+        const comparison = await compareProjects(input);
+        setResult(comparison);
+        toast({
+          title: "AI Analysis Complete",
+          description: "The project comparison is ready.",
+        });
+      } catch (e) {
+        console.error(e);
+        const errorMessage = e instanceof Error ? e.message : "An unknown error occurred.";
+        setError(errorMessage);
+        toast({
+          variant: "destructive",
+          title: "Error During Analysis",
+          description: errorMessage,
+        });
+      }
+    });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>AI-Powered Project Comparison</CardTitle>
+        <CardDescription>
+          Select two projects to generate a comparative analysis of their status, progress, and outlook.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {projectsLoading ? (
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-40" />
+            </div>
+          ) : (
+             <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Select onValueChange={setProjectOneId} value={projectOneId} disabled={isPending}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Project A" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                 <Select onValueChange={setProjectTwoId} value={projectTwoId} disabled={isPending}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select Project B" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {projects.map((project) => (
+                        <SelectItem key={project.id} value={project.id}>
+                          {project.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+              </div>
+              <Button onClick={handleCompareProjects} disabled={isPending || !projectOneId || !projectTwoId}>
+                {isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Analyzing...
+                  </>
+                ) : (
+                  "Compare Projects"
+                )}
+              </Button>
+            </>
+          )}
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+
+          {result && (
+            <Alert>
+              <BarChart2 className="h-4 w-4" />
+              <AlertTitle>Comparative Analysis</AlertTitle>
+              <AlertDescription className="space-y-2 whitespace-pre-wrap">
+                <p className="text-sm">{result.analysis}</p>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
