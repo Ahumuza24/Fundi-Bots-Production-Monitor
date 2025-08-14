@@ -1,5 +1,8 @@
+
 "use client"
 import React, { useState, useEffect, useMemo } from 'react'
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from '@/lib/firebase';
 import {
   Card,
   CardContent,
@@ -20,29 +23,53 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Play, Pause, Square, Plus, Minus } from "lucide-react"
-import { projects } from "@/lib/mock-data"
+import { Play, Pause, Square, Plus, Minus, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Project, ComponentSpec } from "@/lib/types"
 
 export default function WorkSessionsPage() {
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(projects[0].id);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [logQuantities, setLogQuantities] = useState<Record<string, number>>({});
   const { toast } = useToast();
 
+  useEffect(() => {
+    setLoading(true);
+    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      setProjects(projectsData);
+      if (projectsData.length > 0 && !selectedProjectId) {
+        setSelectedProjectId(projectsData[0].id);
+      }
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching projects: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not fetch projects.",
+      });
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [toast, selectedProjectId]);
+  
   const selectedProject = useMemo(() => {
     return projects.find(p => p.id === selectedProjectId) || null;
-  }, [selectedProjectId]);
+  }, [selectedProjectId, projects]);
   
   // Use a local state for project data to simulate real-time updates
   const [projectData, setProjectData] = useState<Project | null>(selectedProject);
 
   useEffect(() => {
-    setProjectData(projects.find(p => p.id === selectedProjectId) || null);
+    const currentProject = projects.find(p => p.id === selectedProjectId) || null;
+    setProjectData(currentProject);
     setLogQuantities({});
-  }, [selectedProjectId]);
+  }, [selectedProjectId, projects]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -71,15 +98,24 @@ export default function WorkSessionsPage() {
     if (!component) return;
 
     const newCompleted = Math.min(component.quantityCompleted + quantity, component.quantityRequired);
-
+    
+    // In a real app, you would update this in Firestore.
+    // For this prototype, we'll just update local state.
     setProjectData(prevData => {
       if (!prevData) return null;
-      return {
-        ...prevData,
-        components: prevData.components.map(c => 
+      const updatedComponents = prevData.components.map(c => 
           c.id === componentId ? { ...c, quantityCompleted: newCompleted } : c
-        )
+        );
+      
+      const updatedProject = {
+          ...prevData,
+          components: updatedComponents
       };
+      
+      // Also update the main projects list to reflect changes across the app
+      setProjects(currentProjects => currentProjects.map(p => p.id === updatedProject.id ? updatedProject : p));
+
+      return updatedProject;
     });
 
     toast({
@@ -105,6 +141,14 @@ export default function WorkSessionsPage() {
     return (completed / total) * 100;
   }, [projectData]);
 
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
       <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
@@ -114,7 +158,7 @@ export default function WorkSessionsPage() {
             <CardDescription>Choose the project you are currently working on to start a session.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={setSelectedProjectId} defaultValue={selectedProjectId || undefined}>
+            <Select onValueChange={setSelectedProjectId} value={selectedProjectId || ''}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
@@ -129,7 +173,7 @@ export default function WorkSessionsPage() {
           </CardContent>
         </Card>
 
-        {projectData && (
+        {projectData ? (
           <Card>
             <CardHeader>
               <CardTitle>{projectData.name}</CardTitle>
@@ -183,6 +227,12 @@ export default function WorkSessionsPage() {
               </div>
             </CardContent>
           </Card>
+        ) : (
+          <Card>
+            <CardContent>
+              <p className="py-4 text-muted-foreground">Select a project to begin, or ask your Project Lead to create one.</p>
+            </CardContent>
+          </Card>
         )}
       </div>
 
@@ -211,6 +261,8 @@ export default function WorkSessionsPage() {
               onClick={() => {
                 setSessionActive(false);
                 setElapsedTime(0);
+                // Here you would also save the session to Firestore
+                toast({ title: "Session Ended", description: `Total time: ${formatTime(elapsedTime)}` });
               }}
               variant="destructive"
               disabled={elapsedTime === 0}
