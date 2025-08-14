@@ -13,6 +13,7 @@ import {
   LogOut,
   Package,
   Settings,
+  Users,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -63,6 +64,18 @@ const NavLinks = () => {
                 <span>
                   <GanttChartSquare />
                   <span className="group-data-[collapsible=icon]:hidden">Projects</span>
+                </span>
+              </SidebarMenuButton>
+            </Link>
+           </SidebarMenuItem>
+        )}
+         {user?.role === 'admin' && (
+           <SidebarMenuItem>
+             <Link href="/dashboard/assemblers">
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/assemblers'} tooltip="Assemblers">
+                <span>
+                  <Users />
+                  <span className="group-data-[collapsible=icon]:hidden">Assemblers</span>
                 </span>
               </SidebarMenuButton>
             </Link>

@@ -32,12 +32,13 @@ import {
   Tooltip,
 } from "recharts"
 import Link from "next/link"
-import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc, onSnapshot } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { projects as mockProjects, workers as mockWorkers } from '@/lib/mock-data';
 import type { Project, Worker } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -47,31 +48,40 @@ export default function Dashboard() {
   const { user } = useAuth();
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const projectsCollection = collection(db, "projects");
-        const projectsSnapshot = await getDocs(projectsCollection);
-        const projectsData = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
-        setProjects(projectsData);
-
-        const workersCollection = collection(db, "workers");
-        const workersSnapshot = await getDocs(workersCollection);
-        const workersData = workersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
-        setWorkers(workersData);
-
-      } catch (error) {
-        console.error("Error fetching data: ", error);
-        toast({
+    setLoading(true);
+    
+    const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+      const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+      setProjects(projectsData);
+    }, (error) => {
+      console.error("Error fetching projects: ", error);
+       toast({
           variant: "destructive",
           title: "Error",
-          description: "Could not fetch data from Firestore.",
+          description: "Could not fetch projects from Firestore.",
         });
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    });
+
+    const workersUnsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
+      const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+      setWorkers(workersData);
+    }, (error) => {
+      console.error("Error fetching workers: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not fetch workers from Firestore.",
+      });
+    });
+
+    // Set loading to false once both have been fetched at least once
+    // A more robust solution might use Promise.all with getDocs for initial load
+    setLoading(false);
+
+    return () => {
+      projectsUnsubscribe();
+      workersUnsubscribe();
+    }
   }, [toast]);
   
   const handleSeedData = async () => {
@@ -94,14 +104,7 @@ export default function Dashboard() {
         title: "Success",
         description: "Mock data has been seeded to Firestore.",
       });
-      // Refresh data
-      const projectsCollection = collection(db, "projects");
-      const projectsSnapshot = await getDocs(projectsCollection);
-      setProjects(projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
-      
-      const workersCollection = collection(db, "workers");
-      const workersSnapshot = await getDocs(workersCollection);
-      setWorkers(workersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker)));
+      // Data will refresh via onSnapshot listeners
       
     } catch (error) {
       console.error("Error seeding data: ", error);
@@ -128,7 +131,11 @@ export default function Dashboard() {
   const recentAssemblers = workers.slice(0, 4);
 
   if (loading) {
-    return <div>Loading dashboard...</div>
+    return (
+      <div className="flex h-screen w-full items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    )
   }
 
   return (
@@ -249,7 +256,7 @@ export default function Dashboard() {
               </CardDescription>
             </div>
             <Button asChild size="sm" className="ml-auto gap-1">
-              <Link href="/dashboard/work-sessions">
+              <Link href="/dashboard/assemblers">
                 View All
                 <ArrowUpRight className="h-4 w-4" />
               </Link>
