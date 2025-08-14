@@ -14,33 +14,33 @@ body {
     --card-foreground: 222 47% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-    --primary: 0 70% 51%; /* Deep Red (#DD3333) - approximated */
+    --primary: 11 85% 54%; /* FundiBots Primary Orange (#ef5824) */
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222 47% 11%;
     --muted: 210 40% 96.1%;
     --muted-foreground: 222 47% 25%;
-    --accent: 25 84% 53%; /* Teal (#F58320) - approximated */
+    --accent: 25 84% 55%; /* FundiBots Secondary Orange (#f58220) */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 71% 53%;
     --destructive-foreground: 0 0% 100%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 25 84% 53%;
-    --chart-1: 0 70% 51%;
-    --chart-2: 25 84% 53%;
-    --chart-3: 222 47% 40%;
-    --chart-4: 222 47% 60%;
-    --chart-5: 210 40% 80%;
+    --ring: 11 85% 54%;
+    --chart-1: 11 85% 54%; /* Primary Orange */
+    --chart-2: 25 84% 55%; /* Secondary Orange */
+    --chart-3: 51 100% 50%; /* Yellow (#fedb00) */
+    --chart-4: 188 89% 47%; /* Cyan (#15bddc) */
+    --chart-5: 79 61% 55%; /* Green (#9fcc3b) */
     --radius: 0.5rem;
     --sidebar-background: 0 0% 100%;
     --sidebar-foreground: 222 47% 11%;
-    --sidebar-primary: 0 70% 51%;
+    --sidebar-primary: 11 85% 54%; /* Primary Orange */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 210 40% 96.1%;
     --sidebar-accent-foreground: 222 47% 11%;
     --sidebar-border: 214.3 31.8% 91.4%;
-    --sidebar-ring: 25 84% 53%;
+    --sidebar-ring: 11 85% 54%;
   }
   .dark {
     --background: 222 47% 11%;
@@ -49,32 +49,32 @@ body {
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 11%;
     --popover-foreground: 210 40% 98%;
-    --primary: 0 70% 51%;
+    --primary: 11 85% 54%; /* FundiBots Primary Orange (#ef5824) */
     --primary-foreground: 0 0% 100%;
     --secondary: 222 47% 20%;
     --secondary-foreground: 210 40% 98%;
     --muted: 222 47% 20%;
     --muted-foreground: 210 40% 80%;
-    --accent: 25 84% 53%;
+    --accent: 25 84% 55%; /* FundiBots Secondary Orange (#f58220) */
     --accent-foreground: 0 0% 100%;
     --destructive: 0 71% 53%;
     --destructive-foreground: 0 0% 100%;
     --border: 222 47% 20%;
     --input: 222 47% 20%;
-    --ring: 25 84% 53%;
-    --chart-1: 0 70% 51%;
-    --chart-2: 25 84% 53%;
-    --chart-3: 210 40% 98%;
-    --chart-4: 210 40% 60%;
-    --chart-5: 210 40% 40%;
+    --ring: 11 85% 54%;
+    --chart-1: 11 85% 54%; /* Primary Orange */
+    --chart-2: 25 84% 55%; /* Secondary Orange */
+    --chart-3: 51 100% 50%; /* Yellow (#fedb00) */
+    --chart-4: 188 89% 47%; /* Cyan (#15bddc) */
+    --chart-5: 79 61% 55%; /* Green (#9fcc3b) */
     --sidebar-background: 222 47% 11%;
     --sidebar-foreground: 210 40% 98%;
-    --sidebar-primary: 0 70% 51%;
+    --sidebar-primary: 11 85% 54%; /* Primary Orange */
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 222 47% 20%;
     --sidebar-accent-foreground: 0 0% 100%;
     --sidebar-border: 222 47% 20%;
-    --sidebar-ring: 25 84% 53%;
+    --sidebar-ring: 11 85% 54%;
   }
 }
 
@@ -84,5 +84,56 @@ body {
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+/* FundiBots Brand Colors */
+@layer utilities {
+  .bg-fundibots-primary {
+    background-color: #ef5824;
+  }
+  .bg-fundibots-secondary {
+    background-color: #f58220;
+  }
+  .bg-fundibots-yellow {
+    background-color: #fedb00;
+  }
+  .bg-fundibots-cyan {
+    background-color: #15bddc;
+  }
+  .bg-fundibots-green {
+    background-color: #9fcc3b;
+  }
+  
+  .text-fundibots-primary {
+    color: #ef5824;
+  }
+  .text-fundibots-secondary {
+    color: #f58220;
+  }
+  .text-fundibots-yellow {
+    color: #fedb00;
+  }
+  .text-fundibots-cyan {
+    color: #15bddc;
+  }
+  .text-fundibots-green {
+    color: #9fcc3b;
+  }
+  
+  .border-fundibots-primary {
+    border-color: #ef5824;
+  }
+  .border-fundibots-secondary {
+    border-color: #f58220;
+  }
+  .border-fundibots-yellow {
+    border-color: #fedb00;
+  }
+  .border-fundibots-cyan {
+    border-color: #15bddc;
+  }
+  .border-fundibots-green {
+    border-color: #9fcc3b;
   }
 }

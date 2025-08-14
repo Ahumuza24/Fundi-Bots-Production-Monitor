@@ -24,6 +24,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+import { WorkloadBalancer } from '@/components/dashboard/workload-balancer';
+import { PerformanceMonitor } from '@/components/dashboard/performance-monitor';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -113,10 +115,18 @@ export default function AssemblersPage() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Assemblers</CardTitle>
-        <CardDescription>
-          An overview of all assemblers, their assigned projects, and progress.
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>Assemblers</CardTitle>
+            <CardDescription>
+              An overview of all assemblers, their assigned projects, and progress.
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <PerformanceMonitor />
+            <WorkloadBalancer onBalanceComplete={() => {}} />
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>

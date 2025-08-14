@@ -65,6 +65,13 @@ export default {
           border: 'hsl(var(--sidebar-border))',
           ring: 'hsl(var(--sidebar-ring))',
         },
+        fundibots: {
+          primary: '#ef5824',
+          secondary: '#f58220',
+          yellow: '#fedb00',
+          cyan: '#15bddc',
+          green: '#9fcc3b',
+        },
       },
       borderRadius: {
         lg: 'var(--radius)',

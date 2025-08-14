@@ -55,9 +55,14 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { CreateProjectDialog } from "@/components/dashboard/create-project-dialog"
+import { CreateProjectDialog } from "@/components/dashboard/create-project-dialog";
+import { ProjectTemplatesDialog } from "@/components/dashboard/project-templates-dialog";
+import { CSVImportDialog } from "@/components/dashboard/csv-import-dialog";
+import { EditProjectDialog } from "@/components/dashboard/edit-project-dialog";
+import { CloneProjectDialog } from "@/components/dashboard/clone-project-dialog";
 import { format } from "date-fns"
 import { Skeleton } from '@/components/ui/skeleton';
+import Link from "next/link";
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -140,6 +145,7 @@ export default function ProjectsPage() {
     if (activeTab === 'completed') return project.status === 'Completed';
     if (activeTab === 'on-hold') return project.status === 'On Hold';
     if (activeTab === 'not-started') return project.status === 'Not Started';
+    if (activeTab === 'archived') return project.status === 'Archived';
     return false;
   }).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
 
@@ -154,8 +160,18 @@ export default function ProjectsPage() {
           <TabsTrigger value="on-hold" className="hidden sm:flex">
             On Hold
           </TabsTrigger>
+          <TabsTrigger value="archived" className="hidden lg:flex">
+            Archived
+          </TabsTrigger>
         </TabsList>
         <div className="ml-auto flex items-center gap-2">
+          <CSVImportDialog onProjectsImported={() => {}} />
+          <ProjectTemplatesDialog onTemplateSelected={(template) => {
+            toast({
+              title: "Template Selected",
+              description: `Template "${template.name}" is ready to use.`,
+            });
+          }} />
           <CreateProjectDialog onProjectCreated={() => {}} />
         </div>
       </div>
@@ -176,6 +192,7 @@ export default function ProjectsPage() {
                   </TableHead>
                   <TableHead>Name</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Priority</TableHead>
                   <TableHead>Progress</TableHead>
                   <TableHead className="hidden md:table-cell">
                     Due Date
@@ -214,7 +231,11 @@ export default function ProjectsPage() {
                           data-ai-hint="circuit board"
                         />
                       </TableCell>
-                      <TableCell className="font-medium">{project.name}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link href={`/dashboard/projects/${project.id}`} className="hover:underline">
+                          {project.name}
+                        </Link>
+                      </TableCell>
                       <TableCell>
                         <Badge variant={project.status === "Completed" ? "default" : "outline"} className={
                           project.status === 'In Progress' ? 'bg-blue-100 text-blue-800' :
@@ -222,6 +243,14 @@ export default function ProjectsPage() {
                           project.status === 'Completed' ? 'bg-green-100 text-green-800' : 
                           project.status === 'Not Started' ? 'bg-gray-100 text-gray-800' : ''
                         }>{project.status}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={
+                          project.priority === 'Critical' ? 'bg-red-100 text-red-800 border-red-200' :
+                          project.priority === 'High' ? 'bg-orange-100 text-orange-800 border-orange-200' :
+                          project.priority === 'Medium' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                          'bg-gray-100 text-gray-800 border-gray-200'
+                        }>{project.priority || 'Medium'}</Badge>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
@@ -246,7 +275,22 @@ export default function ProjectsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => alert('Edit functionality to be implemented. This would open a dialog to edit project details and assign workers.')}>Edit</DropdownMenuItem>
+                            <EditProjectDialog 
+                              project={project} 
+                              onProjectUpdated={() => {}}
+                            >
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                Edit Project
+                              </DropdownMenuItem>
+                            </EditProjectDialog>
+                            <CloneProjectDialog 
+                              project={project} 
+                              onProjectCloned={() => {}}
+                            >
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                Clone Project
+                              </DropdownMenuItem>
+                            </CloneProjectDialog>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>
@@ -254,6 +298,7 @@ export default function ProjectsPage() {
                                   <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'In Progress')}>In Progress</DropdownMenuItem>
                                   <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'On Hold')}>On Hold</DropdownMenuItem>
                                   <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Completed')}>Completed</DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Archived')}>Archive</DropdownMenuItem>
                               </DropdownMenuSubContent>
                             </DropdownMenuSub>
                             <DropdownMenuSeparator />

@@ -4,19 +4,56 @@ export interface ComponentSpec {
   process: string;
   quantityRequired: number;
   quantityCompleted: number;
+  imageUrl?: string;
+  estimatedTimePerUnit?: number; // in minutes
 }
 
 export interface Project {
   id: string;
-  name:string;
+  name: string;
   quantity: number;
   description: string;
   imageUrl: string;
   documentationUrl?: string;
   components: ComponentSpec[];
   deadline: string;
-  status: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold';
+  status: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold' | 'Archived';
   assignedWorkerIds: string[];
+  priority: 'Low' | 'Medium' | 'High' | 'Critical';
+  processSequence?: string[]; // ordered list of processes
+  createdAt: string;
+  updatedAt: string;
+  templateId?: string; // if created from template
+  comments?: ProjectComment[];
+  attachments?: ProjectAttachment[];
+}
+
+export interface ProjectComment {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar?: string;
+  content: string;
+  timestamp: string;
+}
+
+export interface ProjectAttachment {
+  id: string;
+  name: string;
+  url: string;
+  type: string;
+  uploadedBy: string;
+  uploadedAt: string;
+}
+
+export interface ProjectTemplate {
+  id: string;
+  name: string;
+  description: string;
+  components: Omit<ComponentSpec, 'id' | 'quantityRequired' | 'quantityCompleted'>[];
+  processSequence?: string[];
+  estimatedDuration?: number; // in days
+  createdAt: string;
 }
 
 export interface Worker {
@@ -36,9 +73,34 @@ export interface WorkSession {
   id: string;
   workerId: string;
   projectId: string;
+  componentId?: string;
+  process?: string;
   startTime: Date;
   endTime?: Date;
   completedComponents: { componentId: string, quantity: number }[];
+  qualityRating?: 'Good' | 'Needs Rework' | 'Defective';
+  notes?: string;
+  breakTimeSeconds?: number;
+}
+
+export interface ProductionMetrics {
+  projectId: string;
+  workerId: string;
+  date: string;
+  partsCompleted: number;
+  timeSpentMinutes: number;
+  efficiency: number; // parts per hour
+  qualityScore: number;
+}
+
+export interface MachineUtilization {
+  machineId: string;
+  machineName: string;
+  type: 'CNC' | 'Laser' | 'Assembly Station' | 'Other';
+  utilizationPercentage: number;
+  activeTime: number;
+  downTime: number;
+  lastMaintenance?: string;
 }
 
 export interface Notification {

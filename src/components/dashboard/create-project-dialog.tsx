@@ -33,6 +33,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { PlusCircle, Trash2, CalendarIcon, Loader2 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -50,9 +57,11 @@ const projectSchema = z.object({
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   description: z.string().min(1, "Description is required."),
   imageUrl: z.string().url("Please enter a valid image URL."),
+  documentationUrl: z.string().url().optional().or(z.literal("")),
   deadline: z.date({
     required_error: "A due date is required.",
   }),
+  priority: z.enum(["Low", "Medium", "High", "Critical"]),
   components: z.array(componentSchema).min(1, "Please add at least one component."),
 });
 
@@ -70,6 +79,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       quantity: 1,
       description: "",
       imageUrl: "https://placehold.co/600x400.png",
+      documentationUrl: "",
+      priority: "Medium",
       components: [{ name: "", process: "Assembly", quantityPerUnit: 1 }],
     },
   });
@@ -82,14 +93,19 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
   const onSubmit = async (data: ProjectFormData) => {
     setIsSubmitting(true);
     try {
+      const now = new Date().toISOString();
       const newProject = {
         name: data.name,
         quantity: data.quantity,
         description: data.description,
         imageUrl: data.imageUrl,
+        documentationUrl: data.documentationUrl || undefined,
         deadline: data.deadline.toISOString(),
-        status: 'Not Started',
+        priority: data.priority,
+        status: 'Not Started' as const,
         assignedWorkerIds: [],
+        createdAt: now,
+        updatedAt: now,
         components: data.components.map(c => ({
             id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
             name: c.name,
@@ -97,6 +113,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
             quantityRequired: c.quantityPerUnit * data.quantity,
             quantityCompleted: 0
         })),
+        comments: [],
+        attachments: [],
       };
 
       await addDoc(collection(db, "projects"), newProject);
@@ -197,6 +215,21 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 )}
                 />
                 <FormField
+                control={form.control}
+                name="documentationUrl"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Documentation URL (Optional)</FormLabel>
+                    <FormControl>
+                        <Input placeholder="https://example.com/docs.pdf" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+             </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
                     control={form.control}
                     name="deadline"
                     render={({ field }) => (
@@ -236,6 +269,29 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                         <FormMessage />
                         </FormItem>
                     )}
+                />
+                <FormField
+                  control={form.control}
+                  name="priority"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Priority</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select priority" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="Low">Low</SelectItem>
+                          <SelectItem value="Medium">Medium</SelectItem>
+                          <SelectItem value="High">High</SelectItem>
+                          <SelectItem value="Critical">Critical</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
              </div>
 
