@@ -246,7 +246,7 @@ export default function ProjectsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => alert('Edit functionality to be implemented.')}>Edit</DropdownMenuItem>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>

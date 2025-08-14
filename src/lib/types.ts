@@ -26,7 +26,7 @@ export interface Worker {
   skills: string[];
   availability: string; // e.g., "40 hours/week"
   pastPerformance: number; // e.g., 0.95 for 95%
-  timeLoggedSeconds?: number;
+  timeLoggedSeconds: number;
 }
 
 export interface WorkSession {

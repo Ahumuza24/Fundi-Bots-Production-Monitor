@@ -71,11 +71,21 @@ export default function AssemblersPage() {
       });
     });
     
-    // This is a bit of a hack to wait for both snapshots to load initially
-    Promise.all([
-      new Promise(resolve => onSnapshot(collection(db, "workers"), () => resolve(true))),
-      new Promise(resolve => onSnapshot(collection(db, "projects"), () => resolve(true)))
-    ]).then(() => setLoading(false));
+    // A simple way to wait for both initial fetches
+    const workersPromise = new Promise(resolve => {
+      const unsub = onSnapshot(collection(db, "workers"), () => {
+        unsub();
+        resolve(true);
+      });
+    });
+    const projectsPromise = new Promise(resolve => {
+       const unsub = onSnapshot(collection(db, "projects"), () => {
+        unsub();
+        resolve(true);
+      });
+    });
+
+    Promise.all([workersPromise, projectsPromise]).then(() => setLoading(false));
 
     return () => {
       workersUnsubscribe();
@@ -87,8 +97,7 @@ export default function AssemblersPage() {
     const unsubscribe = fetchData();
     return () => unsubscribe();
   }, [fetchData]);
-
-  // This logic is a placeholder. In a real app, assignments would be stored in the database.
+  
   const getAssignedProject = (workerId: string): Project | undefined => {
       return projects.find(p => p.assignedWorkerIds?.includes(workerId));
   }

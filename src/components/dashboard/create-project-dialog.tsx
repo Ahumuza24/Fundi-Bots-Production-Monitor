@@ -49,7 +49,7 @@ const projectSchema = z.object({
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   description: z.string().min(1, "Description is required."),
   imageUrl: z.string().url("Please enter a valid image URL."),
-  dueDate: z.date({
+  deadline: z.date({
     required_error: "A due date is required.",
   }),
   components: z.array(componentSchema).min(1, "Please add at least one component."),
@@ -86,12 +86,12 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
         quantity: data.quantity,
         description: data.description,
         imageUrl: data.imageUrl,
-        deadline: data.dueDate.toISOString(), // Use 'deadline' to match existing data structure
+        deadline: data.deadline.toISOString(),
         status: 'Not Started',
+        assignedWorkerIds: [],
         components: data.components.map(c => ({
             id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
             name: c.name,
-            // Automatic Calculation
             quantityRequired: c.quantityPerUnit * data.quantity,
             quantityCompleted: 0
         })),
@@ -196,7 +196,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 />
                 <FormField
                     control={form.control}
-                    name="dueDate"
+                    name="deadline"
                     render={({ field }) => (
                         <FormItem className="flex flex-col">
                         <FormLabel>Due Date</FormLabel>
