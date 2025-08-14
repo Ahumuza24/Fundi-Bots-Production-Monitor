@@ -47,58 +47,58 @@ const NavLinks = () => {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <Link href="/dashboard" passHref legacyBehavior>
+          <Link href="/dashboard">
             <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
-              <a>
+              <span>
                 <LayoutDashboard />
                 <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
-              </a>
+              </span>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-             <Link href="/dashboard/projects" passHref legacyBehavior>
+             <Link href="/dashboard/projects">
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
-                <a>
+                <span>
                   <GanttChartSquare />
                   <span className="group-data-[collapsible=icon]:hidden">Projects</span>
-                </a>
+                </span>
               </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
         )}
         {user?.role === 'assembler' && (
             <SidebarMenuItem>
-              <Link href="/dashboard/work-sessions" passHref legacyBehavior>
+              <Link href="/dashboard/work-sessions">
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
-                  <a>
+                  <span>
                     <Package />
                     <span className="group-data-[collapsible=icon]:hidden">Work Sessions</span>
-                  </a>
+                  </span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
         )}
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-            <Link href="/dashboard/ai-optimizer" passHref legacyBehavior>
+            <Link href="/dashboard/ai-optimizer">
              <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
-              <a>
+              <span>
                 <Cpu />
                 <span className="group-data-[collapsible=icon]:hidden">AI Optimizer</span>
-              </a>
+              </span>
             </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
         )}
         <SidebarMenuItem>
-          <Link href="/dashboard/notifications" passHref legacyBehavior>
+          <Link href="/dashboard/notifications">
            <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
-            <a>
+            <span>
               <Bell />
               <span className="group-data-[collapsible=icon]:hidden">Notifications</span>
-            </a>
+            </span>
           </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
