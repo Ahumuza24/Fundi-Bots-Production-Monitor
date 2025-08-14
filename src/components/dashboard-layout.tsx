@@ -14,6 +14,7 @@ import {
   Package,
   Settings,
   Users,
+  BarChartHorizontal,
 } from "lucide-react"
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -100,6 +101,18 @@ const NavLinks = () => {
               <span>
                 <Cpu />
                 <span className="group-data-[collapsible=icon]:hidden">AI Optimizer</span>
+              </span>
+            </SidebarMenuButton>
+            </Link>
+           </SidebarMenuItem>
+        )}
+        {user?.role === 'admin' && (
+           <SidebarMenuItem>
+            <Link href="/dashboard/analytics">
+             <SidebarMenuButton asChild isActive={pathname === '/dashboard/analytics'} tooltip="Analytics">
+              <span>
+                <BarChartHorizontal />
+                <span className="group-data-[collapsible=icon]:hidden">Analytics</span>
               </span>
             </SidebarMenuButton>
             </Link>

@@ -16,7 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from '../ui/skeleton';
 
-function useFirestoreCollection<T>(collectionName: string) {
+export function useFirestoreCollection<T extends {id: string}>(collectionName: string) {
   const [data, setData] = useState<T[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
@@ -24,7 +24,7 @@ function useFirestoreCollection<T>(collectionName: string) {
   useEffect(() => {
     setLoading(true);
     const unsubscribe = onSnapshot(collection(db, collectionName), (snapshot) => {
-      const collectionData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as T));
+      const collectionData = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as T));
       setData(collectionData);
       setLoading(false);
     }, (error) => {
@@ -324,18 +324,26 @@ export function ProjectComparer() {
         const projectTwo = projects.find(p => p.id === projectTwoId);
         if (!projectOne || !projectTwo) throw new Error("One or both projects not found");
 
+        const getProjectProgress = (project: Project) => {
+           if (!project.components || project.components.length === 0) return 0;
+            const total = project.components.reduce((sum, c) => sum + (c.quantityRequired || 0), 0);
+            if (total === 0) return 0;
+            const completed = project.components.reduce((sum, c) => sum + (c.quantityCompleted || 0), 0);
+            return (completed / total);
+        }
+
         const input = {
           projectOne: {
             name: projectOne.name,
             deadline: projectOne.deadline,
             status: projectOne.status,
-            progress: projectOne.components.reduce((acc, c) => acc + c.quantityCompleted, 0) / projectOne.components.reduce((acc, c) => acc + c.quantityRequired, 0) || 0,
+            progress: getProjectProgress(projectOne) * 100,
           },
           projectTwo: {
             name: projectTwo.name,
             deadline: projectTwo.deadline,
             status: projectTwo.status,
-            progress: projectTwo.components.reduce((acc, c) => acc + c.quantityCompleted, 0) / projectTwo.components.reduce((acc, c) => acc + c.quantityRequired, 0) || 0,
+            progress: getProjectProgress(projectTwo) * 100,
           },
         };
         const comparison = await compareProjects(input);
