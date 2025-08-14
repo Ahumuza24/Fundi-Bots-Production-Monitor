@@ -1,5 +1,5 @@
 "use client"
-import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass } from "lucide-react"
+import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare } from "lucide-react"
 import {
   Avatar,
   AvatarFallback,
