@@ -1,7 +1,7 @@
 
 "use client"
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -81,7 +81,7 @@ export default function WorkSessionsPage() {
           try {
               await updateDoc(workerRef, { 
                   status: status,
-                  activeProjectId: projectId || null
+                  activeProjectId: projectId ?? null
               });
           } catch (error) {
               console.error("Error updating worker status: ", error);
@@ -111,7 +111,7 @@ export default function WorkSessionsPage() {
 
   const pauseSession = () => {
     setSessionActive(false);
-    updateWorkerStatus('Inactive');
+    updateWorkerStatus('Inactive', null);
   }
 
   const endSession = async () => {
@@ -121,13 +121,8 @@ export default function WorkSessionsPage() {
       
       try {
         // Fetch the latest worker data to get the current time logged
-        const response = await fetch('/api/get-worker', {
-            method: 'POST',
-            body: JSON.stringify({ workerId: user.uid }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        if (!response.ok) throw new Error('Failed to fetch worker data');
-        const workerData = await response.json();
+        const workerDoc = await getDoc(workerRef);
+        const workerData = workerDoc.data() as Worker;
         
         const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
 
@@ -321,7 +316,7 @@ export default function WorkSessionsPage() {
             <Button
               onClick={endSession}
               variant="destructive"
-              disabled={elapsedTime === 0}
+              disabled={elapsedTime === 0 && !sessionActive}
             >
               <Square className="mr-2 h-4 w-4" /> End Session
             </Button>

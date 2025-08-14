@@ -150,8 +150,8 @@ export default function AssemblersPage() {
               ))
             ) : (
               workers.map((worker) => {
-                const assignedProject = getActiveProject(worker);
-                const progress = assignedProject ? getProjectProgress(assignedProject) * 100 : 0;
+                const activeProject = getActiveProject(worker);
+                const progress = activeProject ? getProjectProgress(activeProject) * 100 : 0;
                 
                 return (
                   <TableRow key={worker.id}>
@@ -173,15 +173,15 @@ export default function AssemblersPage() {
                         </Badge>
                     </TableCell>
                     <TableCell>
-                      {assignedProject ? assignedProject.name : <span className="text-muted-foreground">Unassigned</span>}
+                      {activeProject ? activeProject.name : <span className="text-muted-foreground">Unassigned</span>}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
-                       {assignedProject ? (
+                       {activeProject ? (
                         <div className="flex items-center gap-2">
                           <Progress value={progress} className="h-2" />
                           <span className="text-xs text-muted-foreground">{progress.toFixed(0)}%</span>
                         </div>
-                      ) : '-'}
+                      ) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
                       {formatTime(worker.timeLoggedSeconds)}
