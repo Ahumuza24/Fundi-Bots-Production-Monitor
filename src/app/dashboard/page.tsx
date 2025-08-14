@@ -189,7 +189,7 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
-       {user?.role === 'admin' && projects.length === 0 && (
+       {user?.role === 'admin' && projects.length === 0 && workers.length === 0 && (
           <Card>
               <CardHeader>
                   <CardTitle>Welcome to FundiFlow!</CardTitle>
