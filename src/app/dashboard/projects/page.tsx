@@ -246,7 +246,7 @@ export default function ProjectsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => alert('Edit functionality to be implemented.')}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => alert('Edit functionality to be implemented. This would open a dialog to edit project details and assign workers.')}>Edit</DropdownMenuItem>
                             <DropdownMenuSub>
                               <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
                               <DropdownMenuSubContent>

@@ -15,7 +15,7 @@ export interface Project {
   components: ComponentSpec[];
   deadline: string;
   status: 'Not Started' | 'In Progress' | 'Completed' | 'On Hold';
-  assignedWorkerIds?: string[];
+  assignedWorkerIds: string[];
 }
 
 export interface Worker {
