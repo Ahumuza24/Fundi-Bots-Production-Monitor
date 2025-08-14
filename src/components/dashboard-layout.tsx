@@ -110,7 +110,16 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const getRoleDisplayName = () => {
     if (user?.role === 'admin') return 'Project Lead';
     if (user?.role === 'assembler') return 'Assembler';
-    return 'My Account';
+    return user?.displayName || 'My Account';
+  }
+  
+  const getInitials = (name?: string | null) => {
+    if (!name) return "U";
+    const names = name.split(' ');
+    if (names.length > 1) {
+      return names[0][0] + names[names.length - 1][0];
+    }
+    return name.substring(0, 2);
   }
 
   return (
@@ -175,8 +184,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   className="overflow-hidden rounded-full"
                 >
                   <Avatar>
-                    <AvatarImage src={`https://i.pravatar.cc/150?u=${user?.email}`} alt={user?.email || 'User'} />
-                    <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
+                    <AvatarImage src={`https://i.pravatar.cc/150?u=${user?.email}`} alt={user?.displayName || 'User'} />
+                    <AvatarFallback>{getInitials(user?.displayName)}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>

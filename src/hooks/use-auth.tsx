@@ -13,6 +13,7 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  updateProfile,
   User as FirebaseUser,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -22,6 +23,7 @@ export type UserRole = "admin" | "assembler" | "guest";
 interface User {
   uid: string;
   email: string | null;
+  displayName: string | null;
   role: UserRole;
 }
 
@@ -29,7 +31,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, role: UserRole) => Promise<void>;
+  signup: (email: string, password: string, fullName: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   loginAsGuest: () => void;
 }
@@ -54,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
           role: role,
         });
       } else {
@@ -71,18 +74,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     await signInWithEmailAndPassword(auth, email, password);
   };
 
-  const signup = async (email: string, password: string, role: UserRole) => {
+  const signup = async (email: string, password: string, fullName: string, role: UserRole) => {
     sessionStorage.removeItem('guest-user');
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    if(userCredential.user.email) {
+    await updateProfile(userCredential.user, { displayName: fullName });
+    
+    // Refresh user to get displayName
+    const updatedFirebaseUser = auth.currentUser;
+
+    if(updatedFirebaseUser?.email) {
       // In a real app, this would be stored in a database or as a custom claim.
       // We use sessionStorage as a temporary mock for this.
-      sessionStorage.setItem(`role_${userCredential.user.email}`, role);
+      sessionStorage.setItem(`role_${updatedFirebaseUser.email}`, role);
+    }
+    if (updatedFirebaseUser) {
+        setUser({
+          uid: updatedFirebaseUser.uid,
+          email: updatedFirebaseUser.email,
+          displayName: updatedFirebaseUser.displayName,
+          role: getRoleFromEmail(updatedFirebaseUser.email),
+        });
     }
   };
   
   const loginAsGuest = () => {
-    const guestUser = { uid: 'guest', email: 'guest@example.com', role: 'guest' as UserRole };
+    const guestUser = { uid: 'guest', email: 'guest@example.com', role: 'guest' as UserRole, displayName: 'Guest User' };
     sessionStorage.setItem('guest-user', JSON.stringify(guestUser));
     setUser(guestUser);
     setLoading(false);

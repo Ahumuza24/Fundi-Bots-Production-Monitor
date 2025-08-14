@@ -22,6 +22,7 @@ import Link from 'next/link';
 import type { UserRole } from '@/hooks/use-auth';
 
 export default function SignupPage() {
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<UserRole>('assembler');
@@ -34,7 +35,7 @@ export default function SignupPage() {
     e.preventDefault();
     setIsLoading(true);
     try {
-      await signup(email, password, role);
+      await signup(email, password, fullName, role);
       router.push('/dashboard');
     } catch (error) {
       toast({
@@ -57,6 +58,18 @@ export default function SignupPage() {
         </CardHeader>
         <form onSubmit={handleSignup}>
           <CardContent className="grid gap-4">
+             <div className="grid gap-2">
+              <Label htmlFor="fullName">Full Name</Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="John Doe"
+                required
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                disabled={isLoading}
+              />
+            </div>
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
