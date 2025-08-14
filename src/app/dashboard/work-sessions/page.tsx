@@ -24,10 +24,11 @@ import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Play, Pause, Square, Plus, Minus, Loader2 } from "lucide-react"
+import { Play, Pause, Square, Plus, Minus, Loader2, AlertCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Project, ComponentSpec, Worker } from "@/lib/types"
 import { cn } from '@/lib/utils';
+import { isBefore, addDays } from 'date-fns';
 
 export default function WorkSessionsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -196,6 +197,11 @@ export default function WorkSessionsPage() {
     return (completed / total) * 100;
   }, [projectData]);
 
+  const isProjectUrgent = (project: Project) => {
+    const sevenDaysFromNow = addDays(new Date(), 7);
+    return isBefore(new Date(project.deadline), sevenDaysFromNow);
+  }
+
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -220,7 +226,11 @@ export default function WorkSessionsPage() {
               <SelectContent>
                 {projects.map((project) => (
                   <SelectItem key={project.id} value={project.id}>
-                    {project.name}
+                    <div className="flex items-center gap-2">
+                      {isProjectUrgent(project) && <AlertCircle className="h-4 w-4 text-destructive" />}
+                      <span>{project.name}</span>
+                      {isProjectUrgent(project) && <span className="text-xs text-destructive">(Urgent)</span>}
+                    </div>
                   </SelectItem>
                 ))}
               </SelectContent>
