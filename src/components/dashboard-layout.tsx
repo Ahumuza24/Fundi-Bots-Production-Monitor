@@ -1,13 +1,16 @@
+
 "use client"
 
 import * as React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { usePathname } from "next/navigation"
 import {
   Bell,
   Cpu,
   GanttChartSquare,
   LayoutDashboard,
+  LogOut,
   Package,
   PanelLeft,
   Settings,
@@ -31,6 +34,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { useAuth } from "@/hooks/use-auth"
 
 interface NavItemProps {
   href: string;
@@ -74,17 +78,35 @@ const NavItem = ({ href, icon: Icon, label, isMobile }: NavItemProps) => {
 };
 
 
-const NavLinks = ({ isMobile = false }: { isMobile?: boolean }) => (
-  <>
-    <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" isMobile={isMobile} />
-    <NavItem href="/dashboard/projects" icon={GanttChartSquare} label="Projects" isMobile={isMobile} />
-    <NavItem href="/dashboard/work-sessions" icon={Package} label="Work Sessions" isMobile={isMobile} />
-    <NavItem href="/dashboard/ai-optimizer" icon={Cpu} label="AI Optimizer" isMobile={isMobile} />
-    <NavItem href="/dashboard/notifications" icon={Bell} label="Notifications" isMobile={isMobile} />
-  </>
-);
+const NavLinks = ({ isMobile = false }: { isMobile?: boolean }) => {
+    const { user } = useAuth();
+    
+    return (
+      <>
+        <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" isMobile={isMobile} />
+        {user?.role === 'admin' && (
+            <NavItem href="/dashboard/projects" icon={GanttChartSquare} label="Projects" isMobile={isMobile} />
+        )}
+        {user?.role === 'assembler' && (
+            <NavItem href="/dashboard/work-sessions" icon={Package} label="Work Sessions" isMobile={isMobile} />
+        )}
+        {user?.role === 'admin' && (
+            <NavItem href="/dashboard/ai-optimizer" icon={Cpu} label="AI Optimizer" isMobile={isMobile} />
+        )}
+        <NavItem href="/dashboard/notifications" icon={Bell} label="Notifications" isMobile={isMobile} />
+      </>
+    )
+};
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
+    const { user, logout } = useAuth();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        await logout();
+        router.push('/login');
+    };
+
   return (
     <TooltipProvider>
       <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -147,8 +169,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                   className="overflow-hidden rounded-full"
                 >
                   <Avatar>
-                    <AvatarImage src="https://i.pravatar.cc/150?u=manager" alt="Manager" />
-                    <AvatarFallback>M</AvatarFallback>
+                    <AvatarImage src={`https://i.pravatar.cc/150?u=${user?.email}`} alt={user?.email || 'User'} />
+                    <AvatarFallback>{user?.email?.[0].toUpperCase()}</AvatarFallback>
                   </Avatar>
                 </Button>
               </DropdownMenuTrigger>
@@ -158,7 +180,10 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuItem>Support</DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>Logout</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Logout
+                  </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </header>
