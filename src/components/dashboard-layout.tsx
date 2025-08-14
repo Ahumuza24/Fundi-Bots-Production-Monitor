@@ -49,7 +49,10 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard" passHref>
             <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
-                <LayoutDashboard /><span>Dashboard</span>
+              <a>
+                <LayoutDashboard />
+                <span className="group-data-[collapsible=icon]:hidden">Dashboard</span>
+              </a>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
@@ -57,7 +60,10 @@ const NavLinks = () => {
            <SidebarMenuItem>
              <Link href="/dashboard/projects" passHref>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
-                <GanttChartSquare /><span>Projects</span>
+                <a>
+                  <GanttChartSquare />
+                  <span className="group-data-[collapsible=icon]:hidden">Projects</span>
+                </a>
               </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -66,7 +72,10 @@ const NavLinks = () => {
             <SidebarMenuItem>
               <Link href="/dashboard/work-sessions" passHref>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
-                  <Package /><span>Work Sessions</span>
+                  <a>
+                    <Package />
+                    <span className="group-data-[collapsible=icon]:hidden">Work Sessions</span>
+                  </a>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -75,7 +84,10 @@ const NavLinks = () => {
            <SidebarMenuItem>
             <Link href="/dashboard/ai-optimizer" passHref>
              <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
-              <Cpu /><span>AI Optimizer</span>
+              <a>
+                <Cpu />
+                <span className="group-data-[collapsible=icon]:hidden">AI Optimizer</span>
+              </a>
             </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -83,7 +95,10 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard/notifications" passHref>
            <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
-            <Bell /><span>Notifications</span>
+            <a>
+              <Bell />
+              <span className="group-data-[collapsible=icon]:hidden">Notifications</span>
+            </a>
           </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
