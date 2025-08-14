@@ -1,7 +1,7 @@
 
 "use client"
 import React, { useState, useEffect, useMemo } from 'react'
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import {
   Card,
@@ -26,6 +26,7 @@ import { Separator } from "@/components/ui/separator"
 import { Play, Pause, Square, Plus, Minus, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import type { Project, ComponentSpec } from "@/lib/types"
+import { cn } from '@/lib/utils';
 
 export default function WorkSessionsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -90,7 +91,7 @@ export default function WorkSessionsPage() {
     return `${h}:${m}:${s}`;
   };
 
-  const handleLogComponent = (componentId: string) => {
+  const handleLogComponent = async (componentId: string) => {
     const quantity = logQuantities[componentId] || 0;
     if (quantity <= 0 || !projectData) return;
 
@@ -99,31 +100,26 @@ export default function WorkSessionsPage() {
 
     const newCompleted = Math.min(component.quantityCompleted + quantity, component.quantityRequired);
     
-    // In a real app, you would update this in Firestore.
-    // For this prototype, we'll just update local state.
-    setProjectData(prevData => {
-      if (!prevData) return null;
-      const updatedComponents = prevData.components.map(c => 
-          c.id === componentId ? { ...c, quantityCompleted: newCompleted } : c
-        );
-      
-      const updatedProject = {
-          ...prevData,
-          components: updatedComponents
-      };
-      
-      // Also update the main projects list to reflect changes across the app
-      setProjects(currentProjects => currentProjects.map(p => p.id === updatedProject.id ? updatedProject : p));
+    const projectRef = doc(db, 'projects', projectData.id);
+    const updatedComponents = projectData.components.map(c => 
+        c.id === componentId ? { ...c, quantityCompleted: newCompleted } : c
+    );
 
-      return updatedProject;
-    });
-
-    toast({
-      title: "Work Logged",
-      description: `Logged ${quantity} of ${component.name}.`,
-    });
-
-    setLogQuantities(prev => ({...prev, [componentId]: 0}));
+    try {
+        await updateDoc(projectRef, { components: updatedComponents });
+        toast({
+            title: "Work Logged",
+            description: `Logged ${quantity} of ${component.name}.`,
+        });
+        setLogQuantities(prev => ({...prev, [componentId]: 0}));
+    } catch (error) {
+        console.error("Error logging work: ", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not log work. Please try again.",
+        });
+    }
   };
 
   const handleQuantityChange = (componentId: string, value: number) => {
@@ -158,7 +154,7 @@ export default function WorkSessionsPage() {
             <CardDescription>Choose the project you are currently working on to start a session.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={setSelectedProjectId} value={selectedProjectId || ''}>
+            <Select onValueChange={setSelectedProjectId} value={selectedProjectId || ''} disabled={sessionActive}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
@@ -188,7 +184,7 @@ export default function WorkSessionsPage() {
                 </div>
               </div>
               <Separator className="my-4" />
-              <div className="grid gap-6">
+              <div className={cn("grid gap-6", !sessionActive && "opacity-50 pointer-events-none")}>
                 <h3 className="font-semibold">Components</h3>
                 {projectData.components.map((component: ComponentSpec) => {
                   const componentProgress = (component.quantityCompleted / component.quantityRequired) * 100;
@@ -203,7 +199,7 @@ export default function WorkSessionsPage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1">
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) - 1)}>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) - 1)} disabled={!sessionActive}>
                             <Minus className="h-4 w-4" />
                           </Button>
                           <Input
@@ -212,12 +208,13 @@ export default function WorkSessionsPage() {
                             value={logQuantities[component.id] || 0}
                             onChange={(e) => handleQuantityChange(component.id, parseInt(e.target.value, 10))}
                             className="w-16 text-center"
+                            disabled={!sessionActive}
                           />
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) + 1)}>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) + 1)} disabled={!sessionActive}>
                             <Plus className="h-4 w-4" />
                           </Button>
                         </div>
-                        <Button onClick={() => handleLogComponent(component.id)} disabled={!logQuantities[component.id] || logQuantities[component.id] === 0}>
+                        <Button onClick={() => handleLogComponent(component.id)} disabled={!sessionActive || !logQuantities[component.id] || logQuantities[component.id] === 0}>
                           Log Work
                         </Button>
                       </div>
