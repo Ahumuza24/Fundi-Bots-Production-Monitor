@@ -141,7 +141,7 @@ export default function ProjectsPage() {
     if (activeTab === 'on-hold') return project.status === 'On Hold';
     if (activeTab === 'not-started') return project.status === 'Not Started';
     return false;
-  }).sort((a, b) => new Date(b.deadline).getTime() - new Date(a.deadline).getTime());
+  }).sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
 
   return (
     <Tabs defaultValue="all" onValueChange={setActiveTab} value={activeTab}>

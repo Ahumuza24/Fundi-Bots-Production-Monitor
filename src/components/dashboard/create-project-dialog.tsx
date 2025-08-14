@@ -18,6 +18,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,15 +26,22 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { PlusCircle, Trash2 } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { PlusCircle, Trash2, CalendarIcon, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
 
 const componentSchema = z.object({
   name: z.string().min(1, "Component name is required."),
-  quantityRequired: z.coerce.number().min(1, "Quantity must be at least 1."),
+  quantityPerUnit: z.coerce.number().min(1, "Quantity must be at least 1."),
 });
 
 const projectSchema = z.object({
@@ -41,6 +49,9 @@ const projectSchema = z.object({
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   description: z.string().min(1, "Description is required."),
   imageUrl: z.string().url("Please enter a valid image URL."),
+  dueDate: z.date({
+    required_error: "A due date is required.",
+  }),
   components: z.array(componentSchema).min(1, "Please add at least one component."),
 });
 
@@ -58,7 +69,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       quantity: 1,
       description: "",
       imageUrl: "https://placehold.co/600x400.png",
-      components: [{ name: "", quantityRequired: 1 }],
+      components: [{ name: "", quantityPerUnit: 1 }],
     },
   });
 
@@ -70,18 +81,18 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
   const onSubmit = async (data: ProjectFormData) => {
     setIsSubmitting(true);
     try {
-      // Automatic calculation: total components needed is project quantity * quantity per unit.
-      // The current form schema takes total quantity directly, so no calculation needed here,
-      // but the data is structured for it.
       const newProject = {
-        ...data,
-        deadline: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(), // Default 30 day deadline
+        name: data.name,
+        quantity: data.quantity,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        deadline: data.dueDate.toISOString(), // Use 'deadline' to match existing data structure
         status: 'Not Started',
-        // In this model, quantityRequired is the total.
         components: data.components.map(c => ({
             id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
             name: c.name,
-            quantityRequired: c.quantityRequired,
+            // Automatic Calculation
+            quantityRequired: c.quantityPerUnit * data.quantity,
             quantityCompleted: 0
         })),
       };
@@ -169,19 +180,62 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="imageUrl"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Image URL</FormLabel>
-                  <FormControl>
-                    <Input placeholder="https://example.com/image.png" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Image URL</FormLabel>
+                    <FormControl>
+                        <Input placeholder="https://example.com/image.png" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                    control={form.control}
+                    name="dueDate"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-col">
+                        <FormLabel>Due Date</FormLabel>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                            <FormControl>
+                                <Button
+                                variant={"outline"}
+                                className={cn(
+                                    "pl-3 text-left font-normal",
+                                    !field.value && "text-muted-foreground"
+                                )}
+                                >
+                                {field.value ? (
+                                    format(field.value, "PPP")
+                                ) : (
+                                    <span>Pick a date</span>
+                                )}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                                </Button>
+                            </FormControl>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                                mode="single"
+                                selected={field.value}
+                                onSelect={field.onChange}
+                                disabled={(date) =>
+                                date < new Date() || date < new Date("1900-01-01")
+                                }
+                                initialFocus
+                            />
+                            </PopoverContent>
+                        </Popover>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+             </div>
 
             <div>
               <h3 className="text-lg font-medium mb-2">Components</h3>
@@ -204,10 +258,10 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                       />
                       <FormField
                         control={form.control}
-                        name={`components.${index}.quantityRequired`}
+                        name={`components.${index}.quantityPerUnit`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Total Quantity Required</FormLabel>
+                            <FormLabel>Quantity per Unit</FormLabel>
                             <FormControl>
                               <Input type="number" {...field} />
                             </FormControl>
@@ -234,11 +288,14 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => append({ name: "", quantityRequired: 1 })}
+                onClick={() => append({ name: "", quantityPerUnit: 1 })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Component
               </Button>
+              <FormDescription className="mt-2 text-sm">
+                The total quantity required for each component will be automatically calculated by multiplying the project's total quantity by the component's quantity per unit.
+              </FormDescription>
             </div>
             
             <DialogFooter>
@@ -253,4 +310,3 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
     </Dialog>
   );
 }
-
