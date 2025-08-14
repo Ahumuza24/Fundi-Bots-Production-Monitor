@@ -16,7 +16,10 @@ import {
   updateProfile,
   User as FirebaseUser,
 } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
+import { collection, addDoc, doc } from "firebase/firestore";
+import type { Worker } from "@/lib/types";
+
 
 export type UserRole = "admin" | "assembler" | "guest";
 
@@ -81,6 +84,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     // Refresh user to get displayName
     const updatedFirebaseUser = auth.currentUser;
+
+    if (role === 'assembler') {
+        const workerRef = doc(collection(db, "workers"));
+        const newWorker: Worker = {
+            id: workerRef.id,
+            name: fullName,
+            avatarUrl: `https://i.pravatar.cc/150?u=${email}`,
+            skills: ['New Recruit'],
+            availability: 'Pending',
+            pastPerformance: 0,
+        };
+        await addDoc(collection(db, "workers"), newWorker);
+    }
 
     if(updatedFirebaseUser?.email) {
       // In a real app, this would be stored in a database or as a custom claim.
