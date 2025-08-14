@@ -23,6 +23,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
+import { Badge } from '@/components/ui/badge';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -101,6 +102,13 @@ export default function AssemblersPage() {
   const getAssignedProject = (workerId: string): Project | undefined => {
       return projects.find(p => p.assignedWorkerIds?.includes(workerId));
   }
+  
+  const getActiveProject = (worker: Worker): Project | undefined => {
+      if (worker.status === 'Active' && worker.activeProjectId) {
+          return projects.find(p => p.id === worker.activeProjectId);
+      }
+      return getAssignedProject(worker.id);
+  }
 
   return (
     <Card>
@@ -115,6 +123,7 @@ export default function AssemblersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Assembler</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead>Active Project</TableHead>
               <TableHead className="hidden md:table-cell">Progress</TableHead>
               <TableHead className="hidden sm:table-cell">Time Logged</TableHead>
@@ -133,6 +142,7 @@ export default function AssemblersPage() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-full" /></TableCell>
                   <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
@@ -140,7 +150,7 @@ export default function AssemblersPage() {
               ))
             ) : (
               workers.map((worker) => {
-                const assignedProject = getAssignedProject(worker.id);
+                const assignedProject = getActiveProject(worker);
                 const progress = assignedProject ? getProjectProgress(assignedProject) * 100 : 0;
                 
                 return (
@@ -156,6 +166,11 @@ export default function AssemblersPage() {
                           <div className="text-sm text-muted-foreground">{worker.email}</div>
                         </div>
                       </div>
+                    </TableCell>
+                    <TableCell>
+                        <Badge variant={worker.status === 'Active' ? 'default' : 'outline'} className={worker.status === 'Active' ? 'bg-green-100 text-green-800' : ''}>
+                           {worker.status || 'Inactive'}
+                        </Badge>
                     </TableCell>
                     <TableCell>
                       {assignedProject ? assignedProject.name : <span className="text-muted-foreground">Unassigned</span>}

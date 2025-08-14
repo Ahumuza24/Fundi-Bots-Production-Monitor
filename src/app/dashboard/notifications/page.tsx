@@ -5,9 +5,47 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card"
-import { notifications } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
+import { Bell, CheckCircle, Package, AlertTriangle } from 'lucide-react';
+import type { Notification } from '@/lib/types';
+
+
+const notifications: Notification[] = [
+  {
+    id: 'N001',
+    icon: CheckCircle,
+    title: 'Project Completed: AudioPhonic-9000',
+    description: 'All components have been assembled and tested. Ready for shipping.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
+    read: false,
+  },
+  {
+    id: 'N002',
+    icon: Package,
+    title: 'New Project Assigned: Guardian Bot Chassis',
+    description: 'Production for 50 units has been scheduled. Work can now begin.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
+    read: false,
+  },
+  {
+    id: 'N003',
+    icon: AlertTriangle,
+    title: 'Component Shortage: Resistor Pack',
+    description: 'Low stock on Resistor Packs for Model-X Circuit Board. Please re-order.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
+    read: true,
+  },
+  {
+    id: 'N004',
+    icon: Bell,
+    title: 'Weekly Summary Ready',
+    description: 'Your weekly production summary for the period is now available in Analytics.',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
+    read: true,
+  },
+];
+
 
 export default function NotificationsPage() {
   return (

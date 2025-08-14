@@ -1,8 +1,9 @@
 
 "use client"
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { collection, onSnapshot, doc, updateDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
+import { useAuth } from '@/hooks/use-auth';
 import {
   Card,
   CardContent,
@@ -25,7 +26,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Play, Pause, Square, Plus, Minus, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import type { Project, ComponentSpec } from "@/lib/types"
+import type { Project, ComponentSpec, Worker } from "@/lib/types"
 import { cn } from '@/lib/utils';
 
 export default function WorkSessionsPage() {
@@ -36,6 +37,7 @@ export default function WorkSessionsPage() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [logQuantities, setLogQuantities] = useState<Record<string, number>>({});
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
     setLoading(true);
@@ -43,7 +45,9 @@ export default function WorkSessionsPage() {
       const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
       if (projectsData.length > 0 && !selectedProjectId) {
-        setSelectedProjectId(projectsData[0].id);
+        // Find a project assigned to the current user if possible
+        const assignedProject = projectsData.find(p => user && p.assignedWorkerIds?.includes(user.uid));
+        setSelectedProjectId(assignedProject ? assignedProject.id : projectsData[0].id);
       }
       setLoading(false);
     }, (error) => {
@@ -57,13 +61,12 @@ export default function WorkSessionsPage() {
     });
 
     return () => unsubscribe();
-  }, [toast, selectedProjectId]);
-  
+  }, [toast, selectedProjectId, user]);
+
   const selectedProject = useMemo(() => {
     return projects.find(p => p.id === selectedProjectId) || null;
   }, [selectedProjectId, projects]);
-  
-  // Use a local state for project data to simulate real-time updates
+
   const [projectData, setProjectData] = useState<Project | null>(selectedProject);
 
   useEffect(() => {
@@ -72,6 +75,21 @@ export default function WorkSessionsPage() {
     setLogQuantities({});
   }, [selectedProjectId, projects]);
 
+  const updateWorkerStatus = useCallback(async (status: 'Active' | 'Inactive', projectId?: string | null) => {
+      if (user?.uid && user.role === 'assembler') {
+          const workerRef = doc(db, 'workers', user.uid);
+          try {
+              await updateDoc(workerRef, { 
+                  status: status,
+                  activeProjectId: projectId || null
+              });
+          } catch (error) {
+              console.error("Error updating worker status: ", error);
+              toast({ variant: 'destructive', title: "Error", description: "Could not update your status."});
+          }
+      }
+  }, [user, toast]);
+
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (sessionActive) {
@@ -79,10 +97,56 @@ export default function WorkSessionsPage() {
         setElapsedTime(prevTime => prevTime + 1);
       }, 1000);
     } else if (!sessionActive && elapsedTime !== 0) {
-      clearInterval(interval!);
+      if (interval) clearInterval(interval);
     }
-    return () => clearInterval(interval!);
+    return () => {
+      if (interval) clearInterval(interval);
+    };
   }, [sessionActive, elapsedTime]);
+  
+  const startSession = () => {
+    setSessionActive(true);
+    updateWorkerStatus('Active', selectedProjectId);
+  }
+
+  const pauseSession = () => {
+    setSessionActive(false);
+    updateWorkerStatus('Inactive');
+  }
+
+  const endSession = async () => {
+      if(!user || !projectData) return;
+      
+      const workerRef = doc(db, 'workers', user.uid);
+      
+      try {
+        // Fetch the latest worker data to get the current time logged
+        const response = await fetch('/api/get-worker', {
+            method: 'POST',
+            body: JSON.stringify({ workerId: user.uid }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to fetch worker data');
+        const workerData = await response.json();
+        
+        const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
+
+        await updateDoc(workerRef, { 
+            timeLoggedSeconds: newTimeLogged,
+            status: 'Inactive',
+            activeProjectId: null
+        });
+
+        setSessionActive(false);
+        setElapsedTime(0);
+        
+        toast({ title: "Session Ended", description: `Total time: ${formatTime(elapsedTime)}` });
+      } catch (error) {
+          console.error("Error ending session: ", error);
+          toast({ variant: 'destructive', title: "Error", description: "Could not save session data."});
+      }
+  };
+
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -246,21 +310,16 @@ export default function WorkSessionsPage() {
           </CardContent>
           <CardFooter className="flex justify-center gap-2">
             {!sessionActive ? (
-              <Button onClick={() => setSessionActive(true)} disabled={!selectedProject}>
+              <Button onClick={startSession} disabled={!selectedProject}>
                 <Play className="mr-2 h-4 w-4" /> Start Session
               </Button>
             ) : (
-              <Button onClick={() => setSessionActive(false)} variant="outline">
+              <Button onClick={pauseSession} variant="outline">
                 <Pause className="mr-2 h-4 w-4" /> Pause Session
               </Button>
             )}
             <Button
-              onClick={() => {
-                setSessionActive(false);
-                setElapsedTime(0);
-                // Here you would also save the session to Firestore
-                toast({ title: "Session Ended", description: `Total time: ${formatTime(elapsedTime)}` });
-              }}
+              onClick={endSession}
               variant="destructive"
               disabled={elapsedTime === 0}
             >
