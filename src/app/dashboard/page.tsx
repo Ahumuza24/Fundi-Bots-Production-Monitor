@@ -1,11 +1,12 @@
+
 "use client"
-import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare } from "lucide-react"
+import React, { useEffect, useState } from 'react';
+import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare, Database } from "lucide-react"
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
   Card,
@@ -31,20 +32,104 @@ import {
   Tooltip,
 } from "recharts"
 import Link from "next/link"
-import { projects, workers } from "@/lib/mock-data"
-
-const chartData = projects.map(p => ({
-  name: p.name.split(' ')[0],
-  total: p.components.reduce((acc, c) => acc + c.quantityRequired, 0),
-  completed: p.components.reduce((acc, c) => acc + c.quantityCompleted, 0),
-}));
+import { collection, getDocs, writeBatch } from "firebase/firestore";
+import { db } from '@/lib/firebase';
+import { projects as mockProjects, workers as mockWorkers } from '@/lib/mock-data';
+import type { Project, Worker } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/use-auth';
 
 export default function Dashboard() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        const projectsCollection = collection(db, "projects");
+        const projectsSnapshot = await getDocs(projectsCollection);
+        const projectsData = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        setProjects(projectsData);
+
+        const workersCollection = collection(db, "workers");
+        const workersSnapshot = await getDocs(workersCollection);
+        const workersData = workersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
+        setWorkers(workersData);
+
+      } catch (error) {
+        console.error("Error fetching data: ", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not fetch data from Firestore.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [toast]);
+  
+  const handleSeedData = async () => {
+    try {
+      const batch = writeBatch(db);
+
+      mockProjects.forEach(project => {
+        const docRef = collection(db, "projects");
+        batch.set(docRef.doc(project.id), project);
+      });
+      
+      mockWorkers.forEach(worker => {
+        const docRef = collection(db, "workers");
+        batch.set(docRef.doc(worker.id), worker);
+      });
+      
+      await batch.commit();
+      
+      toast({
+        title: "Success",
+        description: "Mock data has been seeded to Firestore.",
+      });
+      // Refresh data
+      const projectsCollection = collection(db, "projects");
+      const projectsSnapshot = await getDocs(projectsCollection);
+      setProjects(projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project)));
+      
+      const workersCollection = collection(db, "workers");
+      const workersSnapshot = await getDocs(workersCollection);
+      setWorkers(workersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker)));
+      
+    } catch (error) {
+      console.error("Error seeding data: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error Seeding Data",
+        description: "Could not write mock data to Firestore.",
+      });
+    }
+  };
+
+
+  const chartData = projects.map(p => ({
+    name: p.name.split(' ')[0],
+    total: p.components.reduce((acc, c) => acc + c.quantityRequired, 0),
+    completed: p.components.reduce((acc, c) => acc + c.quantityCompleted, 0),
+  }));
+
   const projectsInProgress = projects.filter(p => p.status === 'In Progress').length;
   const totalUnitsCompleted = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityCompleted, 0);
   const totalUnits = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityRequired, 0);
   const teamProductivity = totalUnits > 0 ? ((totalUnitsCompleted / totalUnits) * 100).toFixed(0) : 0;
+  
+  const recentAssemblers = workers.slice(0, 4);
 
+  if (loading) {
+    return <div>Loading dashboard...</div>
+  }
 
   return (
     <>
@@ -104,6 +189,22 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+       {user?.role === 'admin' && projects.length === 0 && (
+          <Card>
+              <CardHeader>
+                  <CardTitle>Welcome to FundiFlow!</CardTitle>
+                  <CardDescription>
+                      It looks like there's no data in your database. You can seed the application with some sample data to get started.
+                  </CardDescription>
+              </CardHeader>
+              <CardContent>
+                  <Button onClick={handleSeedData}>
+                      <Database className="mr-2 h-4 w-4" />
+                      Seed Sample Data
+                  </Button>
+              </CardContent>
+          </Card>
+        )}
       <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="xl:col-span-2">
           <CardHeader>
@@ -155,85 +256,34 @@ export default function Dashboard() {
             </Button>
           </CardHeader>
           <CardContent>
+             {recentAssemblers.length > 0 ? (
             <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Assembler</TableHead>
-                  <TableHead>Project</TableHead>
-                  <TableHead className="text-right">Time</TableHead>
+                  <TableHead>Skills</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={workers[0].avatarUrl} alt="Avatar" />
-                        <AvatarFallback>AJ</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{workers[0].name}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {projects[0].name}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    15 min ago
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={workers[1].avatarUrl} alt="Avatar" />
-                        <AvatarFallback>BW</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{workers[1].name}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {projects[2].name}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    45 min ago
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={workers[2].avatarUrl} alt="Avatar" />
-                        <AvatarFallback>CB</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{workers[2].name}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {projects[0].name}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    2 hours ago
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell>
-                    <div className="flex items-center gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={workers[3].avatarUrl} alt="Avatar" />
-                        <AvatarFallback>DP</AvatarFallback>
-                      </Avatar>
-                      <div className="font-medium">{workers[3].name}</div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {projects[2].name}
-                  </TableCell>
-                   <TableCell className="text-right">
-                    5 hours ago
-                  </TableCell>
-                </TableRow>
+                {recentAssemblers.map((worker) => (
+                    <TableRow key={worker.id}>
+                    <TableCell>
+                        <div className="flex items-center gap-2">
+                        <Avatar className="h-8 w-8">
+                            <AvatarImage src={worker.avatarUrl} alt="Avatar" />
+                            <AvatarFallback>{worker.name.charAt(0)}</AvatarFallback>
+                        </Avatar>
+                        <div className="font-medium">{worker.name}</div>
+                        </div>
+                    </TableCell>
+                    <TableCell>
+                        {worker.skills.join(', ')}
+                    </TableCell>
+                    </TableRow>
+                ))}
               </TableBody>
             </Table>
+             ) : <p>No assembler data available.</p>}
           </CardContent>
         </Card>
       </div>

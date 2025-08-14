@@ -1,5 +1,12 @@
+
+"use client"
+import React, { useEffect, useState } from 'react';
 import Image from "next/image"
 import { MoreHorizontal } from "lucide-react"
+import { collection, getDocs } from "firebase/firestore";
+import { db } from '@/lib/firebase';
+import type { Project } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -33,11 +40,10 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs"
 import { Progress } from "@/components/ui/progress"
-import { projects } from "@/lib/mock-data"
 import { CreateProjectDialog } from "@/components/dashboard/create-project-dialog"
 import { format } from "date-fns"
 
-function getProjectProgress(project: typeof projects[0]) {
+function getProjectProgress(project: Project) {
   const total = project.components.reduce((sum, c) => sum + c.quantityRequired, 0);
   if (total === 0) return 0;
   const completed = project.components.reduce((sum, c) => sum + c.quantityCompleted, 0);
@@ -45,8 +51,43 @@ function getProjectProgress(project: typeof projects[0]) {
 }
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState('all');
+
+  useEffect(() => {
+    const fetchProjects = async () => {
+      setLoading(true);
+      try {
+        const projectsCollection = collection(db, "projects");
+        const projectsSnapshot = await getDocs(projectsCollection);
+        const projectsData = projectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
+        setProjects(projectsData);
+      } catch (error) {
+        console.error("Error fetching projects: ", error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Could not fetch projects from Firestore.",
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProjects();
+  }, [toast]);
+  
+  const filteredProjects = projects.filter(project => {
+    if (activeTab === 'all') return true;
+    if (activeTab === 'in-progress') return project.status === 'In Progress';
+    if (activeTab === 'completed') return project.status === 'Completed';
+    if (activeTab === 'on-hold') return project.status === 'On Hold';
+    return false;
+  });
+
   return (
-    <Tabs defaultValue="all">
+    <Tabs defaultValue="all" onValueChange={setActiveTab}>
       <div className="flex items-center">
         <TabsList>
           <TabsTrigger value="all">All</TabsTrigger>
@@ -60,7 +101,7 @@ export default function ProjectsPage() {
           <CreateProjectDialog />
         </div>
       </div>
-      <TabsContent value="all">
+      <TabsContent value={activeTab}>
         <Card>
           <CardHeader>
             <CardTitle>Projects</CardTitle>
@@ -69,6 +110,9 @@ export default function ProjectsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+             {loading ? (
+              <div>Loading projects...</div>
+            ) : (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -87,7 +131,7 @@ export default function ProjectsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {projects.map((project) => (
+                {filteredProjects.map((project) => (
                   <TableRow key={project.id}>
                     <TableCell className="hidden sm:table-cell">
                       <Image
@@ -142,10 +186,11 @@ export default function ProjectsPage() {
                 ))}
               </TableBody>
             </Table>
+            )}
           </CardContent>
           <CardFooter>
             <div className="text-xs text-muted-foreground">
-              Showing <strong>1-{projects.length}</strong> of <strong>{projects.length}</strong>{" "}
+              Showing <strong>1-{filteredProjects.length}</strong> of <strong>{projects.length}</strong>{" "}
               projects
             </div>
           </CardFooter>
