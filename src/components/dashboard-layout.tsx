@@ -49,7 +49,7 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard" passHref>
             <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
-                <a><LayoutDashboard /><span>Dashboard</span></a>
+                <LayoutDashboard /><span>Dashboard</span>
             </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
@@ -57,7 +57,7 @@ const NavLinks = () => {
            <SidebarMenuItem>
              <Link href="/dashboard/projects" passHref>
               <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
-                <a><GanttChartSquare /><span>Projects</span></a>
+                <GanttChartSquare /><span>Projects</span>
               </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -66,7 +66,7 @@ const NavLinks = () => {
             <SidebarMenuItem>
               <Link href="/dashboard/work-sessions" passHref>
                 <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
-                  <a><Package /><span>Work Sessions</span></a>
+                  <Package /><span>Work Sessions</span>
                 </SidebarMenuButton>
               </Link>
             </SidebarMenuItem>
@@ -75,7 +75,7 @@ const NavLinks = () => {
            <SidebarMenuItem>
             <Link href="/dashboard/ai-optimizer" passHref>
              <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
-              <a><Cpu /><span>AI Optimizer</span></a>
+              <Cpu /><span>AI Optimizer</span>
             </SidebarMenuButton>
             </Link>
            </SidebarMenuItem>
@@ -83,7 +83,7 @@ const NavLinks = () => {
         <SidebarMenuItem>
           <Link href="/dashboard/notifications" passHref>
            <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
-            <a><Bell /><span>Notifications</span></a>
+            <Bell /><span>Notifications</span>
           </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
@@ -119,7 +119,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <Sidebar collapsible="icon">
         <SidebarHeader>
-          <div className="flex h-10 items-center justify-center gap-2 rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+          <div className="flex h-10 items-center justify-center gap-2 rounded-full bg-sidebar-primary text-lg font-semibold text-sidebar-primary-foreground">
             <SidebarTrigger>
                 <Package className="h-5 w-5 transition-all group-data-[collapsible=icon]:group-hover/menu-item:scale-110" />
             </SidebarTrigger>
