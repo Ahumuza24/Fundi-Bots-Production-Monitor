@@ -11,12 +11,13 @@ import {
 import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
   signOut,
   User as FirebaseUser,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 
-type UserRole = "admin" | "assembler" | "guest";
+export type UserRole = "admin" | "assembler" | "guest";
 
 interface User {
   uid: string;
@@ -28,18 +29,17 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, role: UserRole) => Promise<void>;
   logout: () => Promise<void>;
   loginAsGuest: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Dummy role assignment. In a real app, this would come from a database or custom claims.
 const getRoleFromEmail = (email: string | null): UserRole => {
   if (!email) return "guest";
-  if (email.endsWith("@admin.com")) {
-    return "admin";
-  }
+  if (sessionStorage.getItem(`role_${email}`) === 'admin') return 'admin';
+  if (email.endsWith("@admin.com")) return "admin";
   return "assembler";
 };
 
@@ -70,6 +70,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     sessionStorage.removeItem('guest-user');
     await signInWithEmailAndPassword(auth, email, password);
   };
+
+  const signup = async (email: string, password: string, role: UserRole) => {
+    sessionStorage.removeItem('guest-user');
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    if(userCredential.user.email) {
+      // In a real app, this would be stored in a database or as a custom claim.
+      // We use sessionStorage as a temporary mock for this.
+      sessionStorage.setItem(`role_${userCredential.user.email}`, role);
+    }
+  };
   
   const loginAsGuest = () => {
     const guestUser = { uid: 'guest', email: 'guest@example.com', role: 'guest' as UserRole };
@@ -80,12 +90,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     sessionStorage.removeItem('guest-user');
+    // Note: we are not cleaning up role session storage on logout
+    // to allow role persistence for returning users in this mock setup.
     await signOut(auth);
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, loginAsGuest }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginAsGuest }}>
       {children}
     </AuthContext.Provider>
   );

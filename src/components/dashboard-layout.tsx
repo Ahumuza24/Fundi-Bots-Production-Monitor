@@ -107,6 +107,12 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         router.push('/login');
     };
 
+  const getRoleDisplayName = () => {
+    if (user?.role === 'admin') return 'Project Lead';
+    if (user?.role === 'assembler') return 'Assembler';
+    return 'My Account';
+  }
+
   return (
     <TooltipProvider>
       <div className="flex min-h-screen w-full flex-col bg-muted/40">
@@ -175,7 +181,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuLabel>My Account</DropdownMenuLabel>
+                <DropdownMenuLabel>{getRoleDisplayName()}</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem>Settings</DropdownMenuItem>
                 <DropdownMenuItem>Support</DropdownMenuItem>
