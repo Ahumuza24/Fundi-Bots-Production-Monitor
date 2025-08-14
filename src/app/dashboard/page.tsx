@@ -32,7 +32,7 @@ import {
   Tooltip,
 } from "recharts"
 import Link from "next/link"
-import { collection, getDocs, writeBatch } from "firebase/firestore";
+import { collection, getDocs, writeBatch, doc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { projects as mockProjects, workers as mockWorkers } from '@/lib/mock-data';
 import type { Project, Worker } from '@/lib/types';
@@ -79,13 +79,13 @@ export default function Dashboard() {
       const batch = writeBatch(db);
 
       mockProjects.forEach(project => {
-        const docRef = collection(db, "projects");
-        batch.set(docRef.doc(project.id), project);
+        const projectRef = doc(db, "projects", project.id);
+        batch.set(projectRef, project);
       });
       
       mockWorkers.forEach(worker => {
-        const docRef = collection(db, "workers");
-        batch.set(docRef.doc(worker.id), worker);
+        const workerRef = doc(db, "workers", worker.id);
+        batch.set(workerRef, worker);
       });
       
       await batch.commit();
