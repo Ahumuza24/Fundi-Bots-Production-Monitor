@@ -47,40 +47,50 @@ const NavLinks = () => {
     return (
       <SidebarMenu>
         <SidebarMenuItem>
-          <SidebarMenuButton href="/dashboard" isActive={pathname === '/dashboard'} tooltip="Dashboard">
-            <LayoutDashboard />
-            Dashboard
-          </SidebarMenuButton>
+          <Link href="/dashboard" passHref>
+            <SidebarMenuButton asChild isActive={pathname === '/dashboard'} tooltip="Dashboard">
+              <LayoutDashboard />
+              Dashboard
+            </SidebarMenuButton>
+          </Link>
         </SidebarMenuItem>
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-             <SidebarMenuButton href="/dashboard/projects" isActive={pathname === '/dashboard/projects'} tooltip="Projects">
-              <GanttChartSquare />
-              Projects
-            </SidebarMenuButton>
+             <Link href="/dashboard/projects" passHref>
+              <SidebarMenuButton asChild isActive={pathname === '/dashboard/projects'} tooltip="Projects">
+                <GanttChartSquare />
+                Projects
+              </SidebarMenuButton>
+            </Link>
            </SidebarMenuItem>
         )}
         {user?.role === 'assembler' && (
             <SidebarMenuItem>
-              <SidebarMenuButton href="/dashboard/work-sessions" isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
-                <Package />
-                Work Sessions
-              </SidebarMenuButton>
+              <Link href="/dashboard/work-sessions" passHref>
+                <SidebarMenuButton asChild isActive={pathname === '/dashboard/work-sessions'} tooltip="Work Sessions">
+                  <Package />
+                  Work Sessions
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
         )}
         {user?.role === 'admin' && (
            <SidebarMenuItem>
-             <SidebarMenuButton href="/dashboard/ai-optimizer" isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
+            <Link href="/dashboard/ai-optimizer" passHref>
+             <SidebarMenuButton asChild isActive={pathname === '/dashboard/ai-optimizer'} tooltip="AI Optimizer">
               <Cpu />
               AI Optimizer
             </SidebarMenuButton>
+            </Link>
            </SidebarMenuItem>
         )}
         <SidebarMenuItem>
-           <SidebarMenuButton href="/dashboard/notifications" isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
+          <Link href="/dashboard/notifications" passHref>
+           <SidebarMenuButton asChild isActive={pathname === '/dashboard/notifications'} tooltip="Notifications">
             <Bell />
             Notifications
           </SidebarMenuButton>
+          </Link>
         </SidebarMenuItem>
       </SidebarMenu>
     )
