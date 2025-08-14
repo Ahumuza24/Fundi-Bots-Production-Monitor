@@ -1,6 +1,7 @@
 export interface ComponentSpec {
   id: string;
   name: string;
+  process: string;
   quantityRequired: number;
   quantityCompleted: number;
 }

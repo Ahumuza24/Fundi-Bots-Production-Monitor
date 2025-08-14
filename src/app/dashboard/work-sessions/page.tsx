@@ -19,6 +19,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
@@ -202,6 +208,19 @@ export default function WorkSessionsPage() {
     return isBefore(new Date(project.deadline), sevenDaysFromNow);
   }
 
+  const componentsByProcess = useMemo(() => {
+    if (!projectData) return {};
+    return projectData.components.reduce((acc, component) => {
+        const process = component.process || 'Uncategorized';
+        if (!acc[process]) {
+            acc[process] = [];
+        }
+        acc[process].push(component);
+        return acc;
+    }, {} as Record<string, ComponentSpec[]>);
+  }, [projectData]);
+
+
   if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -253,43 +272,53 @@ export default function WorkSessionsPage() {
                 </div>
               </div>
               <Separator className="my-4" />
-              <div className={cn("grid gap-6", !sessionActive && "opacity-50 pointer-events-none")}>
-                <h3 className="font-semibold">Components</h3>
-                {projectData.components.map((component: ComponentSpec) => {
-                  const componentProgress = (component.quantityCompleted / component.quantityRequired) * 100;
-                  return (
-                    <div key={component.id} className="grid gap-4">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <Label htmlFor={`log-${component.id}`}>{component.name}</Label>
-                          <span className="text-sm text-muted-foreground">{component.quantityCompleted} / {component.quantityRequired}</span>
-                        </div>
-                        <Progress value={componentProgress} />
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1">
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) - 1)} disabled={!sessionActive}>
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <Input
-                            id={`log-${component.id}`}
-                            type="number"
-                            value={logQuantities[component.id] || 0}
-                            onChange={(e) => handleQuantityChange(component.id, parseInt(e.target.value, 10))}
-                            className="w-16 text-center"
-                            disabled={!sessionActive}
-                          />
-                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) + 1)} disabled={!sessionActive}>
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <Button onClick={() => handleLogComponent(component.id)} disabled={!sessionActive || !logQuantities[component.id] || logQuantities[component.id] === 0}>
-                          Log Work
-                        </Button>
-                      </div>
-                    </div>
-                  )
-                })}
+              <div className={cn(!sessionActive && "opacity-50 pointer-events-none")}>
+                <Accordion type="single" collapsible className="w-full" defaultValue={Object.keys(componentsByProcess)[0]}>
+                    {Object.entries(componentsByProcess).map(([processName, components]) => (
+                        <AccordionItem value={processName} key={processName}>
+                            <AccordionTrigger className="text-base font-semibold">{processName}</AccordionTrigger>
+                            <AccordionContent>
+                                <div className="grid gap-6">
+                                    {components.map((component: ComponentSpec) => {
+                                    const componentProgress = (component.quantityCompleted / component.quantityRequired) * 100;
+                                    return (
+                                        <div key={component.id} className="grid gap-4">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                            <Label htmlFor={`log-${component.id}`}>{component.name}</Label>
+                                            <span className="text-sm text-muted-foreground">{component.quantityCompleted} / {component.quantityRequired}</span>
+                                            </div>
+                                            <Progress value={componentProgress} />
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) - 1)} disabled={!sessionActive}>
+                                                <Minus className="h-4 w-4" />
+                                            </Button>
+                                            <Input
+                                                id={`log-${component.id}`}
+                                                type="number"
+                                                value={logQuantities[component.id] || 0}
+                                                onChange={(e) => handleQuantityChange(component.id, parseInt(e.target.value, 10))}
+                                                className="w-16 text-center"
+                                                disabled={!sessionActive}
+                                            />
+                                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) + 1)} disabled={!sessionActive}>
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                            </div>
+                                            <Button onClick={() => handleLogComponent(component.id)} disabled={!sessionActive || !logQuantities[component.id] || logQuantities[component.id] === 0}>
+                                            Log Work
+                                            </Button>
+                                        </div>
+                                        </div>
+                                    )
+                                    })}
+                                </div>
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
               </div>
             </CardContent>
           </Card>

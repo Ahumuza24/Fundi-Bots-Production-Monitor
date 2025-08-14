@@ -41,6 +41,7 @@ import { format } from "date-fns";
 
 const componentSchema = z.object({
   name: z.string().min(1, "Component name is required."),
+  process: z.string().min(1, "Process is required."),
   quantityPerUnit: z.coerce.number().min(1, "Quantity must be at least 1."),
 });
 
@@ -69,7 +70,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       quantity: 1,
       description: "",
       imageUrl: "https://placehold.co/600x400.png",
-      components: [{ name: "", quantityPerUnit: 1 }],
+      components: [{ name: "", process: "Assembly", quantityPerUnit: 1 }],
     },
   });
 
@@ -92,6 +93,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
         components: data.components.map(c => ({
             id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
             name: c.name,
+            process: c.process,
             quantityRequired: c.quantityPerUnit * data.quantity,
             quantityCompleted: 0
         })),
@@ -238,11 +240,11 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
              </div>
 
             <div>
-              <h3 className="text-lg font-medium mb-2">Components</h3>
+              <h3 className="text-lg font-medium mb-2">Components & Processes</h3>
               <div className="space-y-4">
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md relative">
-                    <div className="grid grid-cols-2 gap-4 flex-grow">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow">
                       <FormField
                         control={form.control}
                         name={`components.${index}.name`}
@@ -251,6 +253,19 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                             <FormLabel>Component Name</FormLabel>
                             <FormControl>
                               <Input placeholder="e.g., Microcontroller" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                       <FormField
+                        control={form.control}
+                        name={`components.${index}.process`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Process</FormLabel>
+                            <FormControl>
+                              <Input placeholder="e.g., Assembly" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -288,7 +303,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => append({ name: "", quantityPerUnit: 1 })}
+                onClick={() => append({ name: "", process: "Assembly", quantityPerUnit: 1 })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Component
