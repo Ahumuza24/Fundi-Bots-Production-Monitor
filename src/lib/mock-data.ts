@@ -1,5 +1,4 @@
-import type { Project, Worker, Notification } from './types';
-import { Bell, CheckCircle, Package, AlertTriangle } from 'lucide-react';
+import type { Project, Worker } from './types';
 
 export const workers: Omit<Worker, 'id' | 'email' | 'timeLoggedSeconds'>[] = [
   { name: 'Alice Johnson', avatarUrl: 'https://i.pravatar.cc/150?u=a042581f4e29026704d', skills: ['Soldering', 'Final Assembly', 'QA Testing'], availability: '40 hours/week', pastPerformance: 0.98 },
@@ -66,40 +65,4 @@ export const projects: Omit<Project, 'id'>[] = [
         { id: 'C10', name: 'Core Fusion Reactor', quantityRequired: 1, quantityCompleted: 0},
     ]
   }
-];
-
-
-export const notifications: Notification[] = [
-  {
-    id: 'N001',
-    icon: CheckCircle,
-    title: 'Project Completed: AudioPhonic-9000',
-    description: 'All components have been assembled and tested. Ready for shipping.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 30), // 30 mins ago
-    read: false,
-  },
-  {
-    id: 'N002',
-    icon: Package,
-    title: 'New Project Assigned: Guardian Bot Chassis',
-    description: 'Production for 50 units has been scheduled. Work can now begin.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2), // 2 hours ago
-    read: false,
-  },
-  {
-    id: 'N003',
-    icon: AlertTriangle,
-    title: 'Component Shortage: Resistor Pack',
-    description: 'Low stock on Resistor Packs for Model-X Circuit Board. Please re-order.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 8), // 8 hours ago
-    read: true,
-  },
-  {
-    id: 'N004',
-    icon: Bell,
-    title: 'Weekly Summary Ready',
-    description: 'Your weekly production summary for the period is now available in Analytics.',
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24), // 1 day ago
-    read: true,
-  },
 ];
