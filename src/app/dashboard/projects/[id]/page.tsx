@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import {
   Table,
   TableBody,
@@ -27,7 +27,7 @@ import { doc, onSnapshot, collection } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import type { Project, Worker } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProjectComments } from '@/components/dashboard/project-comments';
 
@@ -37,6 +37,21 @@ function getProjectProgress(project: Project) {
   if (total === 0) return 0;
   const completed = project.components.reduce((sum, c) => sum + (c.quantityCompleted || 0), 0);
   return (completed / total) * 100;
+}
+
+function formatSafeDate(dateValue: string | Date | undefined, formatString: string = 'MMM dd, yyyy'): string {
+  if (!dateValue) return 'N/A';
+  
+  try {
+    const date = new Date(dateValue);
+    if (isValid(date)) {
+      return format(date, formatString);
+    }
+    return 'N/A';
+  } catch (error) {
+    console.warn('Invalid date value:', dateValue);
+    return 'N/A';
+  }
 }
 
 export default function ProjectDetailPage() {
@@ -199,15 +214,15 @@ export default function ProjectDetailPage() {
                     </div>
                     <div>
                       <div className="text-muted-foreground">Deadline</div>
-                      <div className="font-medium">{format(new Date(project.deadline), 'MMM dd, yyyy')}</div>
+                      <div className="font-medium">{formatSafeDate(project.deadline)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Created</div>
-                      <div className="font-medium">{format(new Date(project.createdAt), 'MMM dd, yyyy')}</div>
+                      <div className="font-medium">{formatSafeDate(project.createdAt)}</div>
                     </div>
                     <div>
                       <div className="text-muted-foreground">Last Updated</div>
-                      <div className="font-medium">{format(new Date(project.updatedAt), 'MMM dd, yyyy')}</div>
+                      <div className="font-medium">{formatSafeDate(project.updatedAt)}</div>
                     </div>
                   </div>
                   {project.documentationUrl && (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -41,9 +41,11 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PlusCircle, Trash2, CalendarIcon, Loader2, Users, FileText } from "lucide-react";
+import { FileUpload } from "@/components/ui/file-upload";
 import { useToast } from "@/hooks/use-toast";
-import { collection, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, doc, updateDoc, onSnapshot, deleteField } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -62,8 +64,8 @@ const editProjectSchema = z.object({
   name: z.string().min(1, "Project name is required."),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   description: z.string().min(1, "Description is required."),
-  imageUrl: z.string().url("Please enter a valid image URL."),
-  documentationUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: z.string().optional(),
+  documentationUrl: z.string().optional(),
   deadline: z.date({
     required_error: "A due date is required.",
   }),
@@ -86,30 +88,92 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
   const [open, setOpen] = useState(false);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
+  const [documentRemoved, setDocumentRemoved] = useState(false);
 
   const form = useForm<EditProjectFormData>({
     resolver: zodResolver(editProjectSchema),
     defaultValues: {
-      name: project.name,
-      quantity: project.quantity,
-      description: project.description,
-      imageUrl: project.imageUrl,
+      name: project.name || "",
+      quantity: project.quantity || 1,
+      description: project.description || "",
+      imageUrl: project.imageUrl || "",
       documentationUrl: project.documentationUrl || "",
       deadline: new Date(project.deadline),
-      priority: project.priority,
-      status: project.status,
+      priority: project.priority || "Medium",
+      status: project.status || "Not Started",
       assignedWorkerIds: project.assignedWorkerIds || [],
-      components: project.components,
+      components: project.components?.map(component => ({
+        id: component.id || "",
+        name: component.name || "",
+        process: component.process || "",
+        quantityRequired: component.quantityRequired || 0,
+        quantityCompleted: component.quantityCompleted || 0,
+        imageUrl: component.imageUrl || "",
+      })) || [],
     },
   });
+
+  // Reset form when project changes
+  React.useEffect(() => {
+    form.reset({
+      name: project.name || "",
+      quantity: project.quantity || 1,
+      description: project.description || "",
+      imageUrl: project.imageUrl || "",
+      documentationUrl: project.documentationUrl || "",
+      deadline: new Date(project.deadline),
+      priority: project.priority || "Medium",
+      status: project.status || "Not Started",
+      assignedWorkerIds: project.assignedWorkerIds || [],
+      components: project.components?.map(component => ({
+        id: component.id || "",
+        name: component.name || "",
+        process: component.process || "",
+        quantityRequired: component.quantityRequired || 0,
+        quantityCompleted: component.quantityCompleted || 0,
+        imageUrl: component.imageUrl || "",
+      })) || [],
+    });
+  }, [project, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "components",
   });
 
+  const handleImageFileSelect = useCallback((file: File) => {
+    setImageFile(file);
+    setImageRemoved(false);
+  }, []);
+
+  const handleImageFileRemove = useCallback(() => {
+    setImageFile(null);
+    setImageRemoved(true);
+    form.setValue('imageUrl', '');
+  }, [form]);
+
+  const handleDocumentFileSelect = useCallback((file: File) => {
+    setDocumentFile(file);
+    setDocumentRemoved(false);
+  }, []);
+
+  const handleDocumentFileRemove = useCallback(() => {
+    setDocumentFile(null);
+    setDocumentRemoved(true);
+    form.setValue('documentationUrl', '');
+  }, [form]);
+
   useEffect(() => {
     if (open) {
+      // Reset file states when dialog opens
+      setImageFile(null);
+      setDocumentFile(null);
+      setImageRemoved(false);
+      setDocumentRemoved(false);
+      
       const unsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
         const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
         setWorkers(workersData);
@@ -118,16 +182,58 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
     }
   }, [open]);
 
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const onSubmit = async (data: EditProjectFormData) => {
+    console.log("Form submitted with data:", data);
     setIsSubmitting(true);
     try {
+      // Handle image upload/removal
+      let imageUrl = project.imageUrl; // Start with existing image
+      
+      if (imageFile) {
+        // New file uploaded
+        imageUrl = await convertFileToBase64(imageFile);
+      } else if (imageRemoved) {
+        // File was explicitly removed
+        imageUrl = "https://placehold.co/600x400.png";
+      }
+      
+      // Handle document upload/removal
+      let documentationUrl: string | typeof deleteField | null = project.documentationUrl;
+      
+      if (documentFile) {
+        // New file uploaded
+        documentationUrl = await convertFileToBase64(documentFile);
+      } else if (documentRemoved) {
+        // File was explicitly removed - use deleteField to remove from Firestore
+        documentationUrl = deleteField();
+      }
+
       const projectRef = doc(db, "projects", project.id);
-      const updatedProject = {
+      
+      // Prepare the update data
+      const updatedProject: any = {
         ...data,
+        imageUrl,
+        documentationUrl,
         deadline: data.deadline.toISOString(),
-        documentationUrl: data.documentationUrl || undefined,
         updatedAt: new Date().toISOString(),
       };
+
+      // Remove any undefined values from the data object
+      Object.keys(updatedProject).forEach(key => {
+        if (updatedProject[key] === undefined) {
+          delete updatedProject[key];
+        }
+      });
 
       await updateDoc(projectRef, updatedProject);
 
@@ -136,6 +242,10 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
         description: `Project "${data.name}" has been successfully updated.`,
       });
       
+      setImageFile(null);
+      setDocumentFile(null);
+      setImageRemoved(false);
+      setDocumentRemoved(false);
       setOpen(false);
       onProjectUpdated();
 
@@ -164,15 +274,21 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
           </DialogDescription>
         </DialogHeader>
         
-        <Tabs defaultValue="details" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="details">Project Details</TabsTrigger>
-            <TabsTrigger value="workers">Assign Workers</TabsTrigger>
-            <TabsTrigger value="components">Components</TabsTrigger>
-          </TabsList>
-          
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+            console.log("Form validation errors:", errors);
+            toast({
+              variant: "destructive",
+              title: "Validation Error",
+              description: "Please check the form for errors and try again.",
+            });
+          })} className="space-y-6">
+            <Tabs defaultValue="details" className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="details">Project Details</TabsTrigger>
+                <TabsTrigger value="workers">Assign Workers</TabsTrigger>
+                <TabsTrigger value="components">Components</TabsTrigger>
+              </TabsList>
               <TabsContent value="details" className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
@@ -218,32 +334,38 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                 />
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="imageUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Image URL</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/image.png" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="documentationUrl"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Documentation URL (Optional)</FormLabel>
-                        <FormControl>
-                          <Input placeholder="https://example.com/docs.pdf" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <div>
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Project Image
+                    </label>
+                    <div className="mt-2">
+                      <FileUpload
+                        onFileSelect={handleImageFileSelect}
+                        onFileRemove={handleImageFileRemove}
+                        currentFile={imageFile}
+                        currentUrl={!imageFile && !imageRemoved ? project.imageUrl : undefined}
+                        accept="image/*"
+                        placeholder="Upload new project image"
+                        maxSize={5 * 1024 * 1024} // 5MB for images
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Documentation (Optional)
+                    </label>
+                    <div className="mt-2">
+                      <FileUpload
+                        onFileSelect={handleDocumentFileSelect}
+                        onFileRemove={handleDocumentFileRemove}
+                        currentFile={documentFile}
+                        currentUrl={!documentFile && !documentRemoved ? project.documentationUrl : undefined}
+                        accept=".pdf,.doc,.docx"
+                        placeholder="Upload new documentation"
+                        maxSize={10 * 1024 * 1024} // 10MB for documents
+                      />
+                    </div>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -360,7 +482,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                               return (
                                 <FormItem
                                   key={worker.id}
-                                  className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4"
+                                  className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4 hover:bg-fundibots-primary/5 transition-colors"
                                 >
                                   <FormControl>
                                     <Checkbox
@@ -376,16 +498,26 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                                       }}
                                     />
                                   </FormControl>
-                                  <div className="space-y-1 leading-none">
-                                    <FormLabel className="font-medium">
+                                  <Avatar className="h-10 w-10 border-2 border-fundibots-primary/20 mt-1">
+                                    <AvatarFallback className="bg-gradient-to-br from-fundibots-secondary to-fundibots-yellow text-white font-semibold text-sm">
+                                      {(() => {
+                                        const names = worker.name.trim().split(' ').filter(n => n.length > 0);
+                                        if (names.length === 0) return "W";
+                                        if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                                        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                                      })()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="space-y-1 leading-none flex-1">
+                                    <FormLabel className="font-medium text-gray-900 cursor-pointer">
                                       {worker.name}
                                     </FormLabel>
-                                    <div className="text-sm text-muted-foreground">
+                                    <div className="text-sm text-fundibots-primary font-medium">
                                       {worker.email}
                                     </div>
                                     <div className="flex flex-wrap gap-1 mt-2">
                                       {worker.skills.map((skill, index) => (
-                                        <Badge key={index} variant="secondary" className="text-xs">
+                                        <Badge key={index} variant="secondary" className="text-xs bg-fundibots-primary/10 text-fundibots-primary border-fundibots-primary/20">
                                           {skill}
                                         </Badge>
                                       ))}
@@ -494,16 +626,16 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                   </Button>
                 </div>
               </TabsContent>
-              
-              <DialogFooter>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Update Project
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </Tabs>
+            </Tabs>
+            
+            <DialogFooter>
+              <Button type="submit" disabled={isSubmitting}>
+                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Update Project
+              </Button>
+            </DialogFooter>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );

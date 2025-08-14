@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   LineChart,
@@ -286,15 +286,18 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                           onClick={() => setSelectedWorker(worker.workerId)}
                         >
                           <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarImage 
-                                  src={workers.find(w => w.id === worker.workerId)?.avatarUrl} 
-                                  alt={worker.workerName} 
-                                />
-                                <AvatarFallback>{worker.workerName.charAt(0)}</AvatarFallback>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8 border-2 border-fundibots-yellow/20">
+                                <AvatarFallback className="bg-gradient-to-br from-fundibots-yellow to-fundibots-secondary text-white font-semibold text-xs">
+                                  {(() => {
+                                    const names = worker.workerName.trim().split(' ').filter(n => n.length > 0);
+                                    if (names.length === 0) return "W";
+                                    if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                                    return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                                  })()}
+                                </AvatarFallback>
                               </Avatar>
-                              <div className="font-medium">{worker.workerName}</div>
+                              <div className="font-medium text-gray-900">{worker.workerName}</div>
                             </div>
                           </TableCell>
                           <TableCell>
@@ -345,15 +348,18 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                   {/* Worker Details */}
                   <Card>
                     <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage 
-                            src={workers.find(w => w.id === selectedWorkerData.workerId)?.avatarUrl} 
-                            alt={selectedWorkerData.workerName} 
-                          />
-                          <AvatarFallback>{selectedWorkerData.workerName.charAt(0)}</AvatarFallback>
+                      <CardTitle className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 border-2 border-fundibots-primary/20">
+                          <AvatarFallback className="bg-gradient-to-br from-fundibots-primary to-fundibots-cyan text-white font-semibold text-xs">
+                            {(() => {
+                              const names = selectedWorkerData.workerName.trim().split(' ').filter(n => n.length > 0);
+                              if (names.length === 0) return "W";
+                              if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                              return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                            })()}
+                          </AvatarFallback>
                         </Avatar>
-                        {selectedWorkerData.workerName}
+                        <span className="text-gray-900">{selectedWorkerData.workerName}</span>
                       </CardTitle>
                       <CardDescription>Individual performance analysis</CardDescription>
                     </CardHeader>

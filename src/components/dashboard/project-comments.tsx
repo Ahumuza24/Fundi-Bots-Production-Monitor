@@ -20,7 +20,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, Send, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -62,7 +62,7 @@ export function ProjectComments({ project, onCommentAdded }: ProjectCommentsProp
         id: `comment-${Date.now()}`,
         userId: user.uid,
         userName: user.displayName || user.email || 'Unknown User',
-        userAvatar: `https://i.pravatar.cc/150?u=${user.email}`,
+        userAvatar: '', // No longer using external avatars
         content: data.content,
         timestamp: new Date().toISOString(),
       };
@@ -149,9 +149,15 @@ export function ProjectComments({ project, onCommentAdded }: ProjectCommentsProp
               .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
               .map((comment) => (
                 <div key={comment.id} className="flex gap-3 p-4 border rounded-lg">
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src={comment.userAvatar} alt={comment.userName} />
-                    <AvatarFallback>{comment.userName.charAt(0)}</AvatarFallback>
+                  <Avatar className="h-8 w-8 border-2 border-fundibots-primary/20">
+                    <AvatarFallback className="bg-gradient-to-br from-fundibots-secondary to-fundibots-cyan text-white font-semibold text-xs">
+                      {(() => {
+                        const names = comment.userName.trim().split(' ').filter(n => n.length > 0);
+                        if (names.length === 0) return "U";
+                        if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                        return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                      })()}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1">
                     <div className="flex items-center gap-2">

@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -167,13 +167,19 @@ export default function AssemblersPage() {
                   <TableRow key={worker.id}>
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage src={worker.avatarUrl} alt={worker.name} />
-                          <AvatarFallback>{worker.name.charAt(0)}</AvatarFallback>
+                        <Avatar className="h-10 w-10 border-2 border-fundibots-primary/20">
+                          <AvatarFallback className="bg-gradient-to-br from-fundibots-primary to-fundibots-secondary text-white font-semibold">
+                            {(() => {
+                              const names = worker.name.trim().split(' ').filter(n => n.length > 0);
+                              if (names.length === 0) return "W";
+                              if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                              return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                            })()}
+                          </AvatarFallback>
                         </Avatar>
                         <div>
-                          <div className="font-medium">{worker.name}</div>
-                          <div className="text-sm text-muted-foreground">{worker.email}</div>
+                          <div className="font-medium text-gray-900">{worker.name}</div>
+                          <div className="text-sm text-fundibots-primary font-medium">{worker.email}</div>
                         </div>
                       </div>
                     </TableCell>

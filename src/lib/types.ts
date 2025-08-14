@@ -32,7 +32,6 @@ export interface ProjectComment {
   id: string;
   userId: string;
   userName: string;
-  userAvatar?: string;
   content: string;
   timestamp: string;
 }
@@ -60,7 +59,6 @@ export interface Worker {
   id: string;
   name: string;
   email: string;
-  avatarUrl: string;
   skills: string[];
   availability: string; // e.g., "40 hours/week"
   pastPerformance: number; // e.g., 0.95 for 95%

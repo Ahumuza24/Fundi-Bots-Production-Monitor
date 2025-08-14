@@ -5,7 +5,6 @@ import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttCh
 import {
   Avatar,
   AvatarFallback,
-  AvatarImage,
 } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import {
@@ -150,53 +149,61 @@ export default function Dashboard() {
   return (
     <>
       <div className="grid gap-4 md:grid-cols-2 md:gap-8 lg:grid-cols-4">
-        <Card>
+        <Card className="card-hover-gradient border-l-4 border-l-fundibots-primary">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Projects In Progress
             </CardTitle>
-            <GanttChartSquare className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-fundibots-primary/10 rounded-lg">
+              <GanttChartSquare className="h-4 w-4 text-fundibots-primary" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{projectsInProgress}</div>
+            <div className="text-2xl font-bold text-fundibots-primary">{projectsInProgress}</div>
             <p className="text-xs text-muted-foreground">
               {projects.length} total projects
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-hover-gradient border-l-4 border-l-fundibots-green">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
               Completed Units
             </CardTitle>
-            <CheckCircle className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-fundibots-green/10 rounded-lg">
+              <CheckCircle className="h-4 w-4 text-fundibots-green" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalUnitsCompleted.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-fundibots-green">{totalUnitsCompleted.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
               out of {totalUnits.toLocaleString()} total units
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-hover-gradient border-l-4 border-l-fundibots-cyan">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Team Productivity</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-fundibots-cyan/10 rounded-lg">
+              <Users className="h-4 w-4 text-fundibots-cyan" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{teamProductivity}%</div>
+            <div className="text-2xl font-bold text-fundibots-cyan">{teamProductivity}%</div>
             <p className="text-xs text-muted-foreground">
               Across all projects
             </p>
           </CardContent>
         </Card>
-        <Card>
+        <Card className="card-hover-gradient border-l-4 border-l-fundibots-yellow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Urgent Deadlines</CardTitle>
-            <Hourglass className="h-4 w-4 text-muted-foreground" />
+            <div className="p-2 bg-fundibots-yellow/10 rounded-lg">
+              <Hourglass className="h-4 w-4 text-fundibots-yellow" />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
+            <div className="text-2xl font-bold text-fundibots-yellow">
               {projects.filter(p => new Date(p.deadline).getTime() < new Date().getTime() + 7 * 24 * 60 * 60 * 1000).length}
             </div>
             <p className="text-xs text-muted-foreground">
@@ -284,12 +291,18 @@ export default function Dashboard() {
                 {recentAssemblers.map((worker) => (
                     <TableRow key={worker.id}>
                     <TableCell>
-                        <div className="flex items-center gap-2">
-                        <Avatar className="h-8 w-8">
-                            <AvatarImage src={worker.avatarUrl} alt="Avatar" />
-                            <AvatarFallback>{worker.name.charAt(0)}</AvatarFallback>
+                        <div className="flex items-center gap-3">
+                        <Avatar className="h-8 w-8 border-2 border-fundibots-primary/20">
+                            <AvatarFallback className="bg-gradient-to-br from-fundibots-primary to-fundibots-secondary text-white font-semibold text-xs">
+                              {(() => {
+                                const names = worker.name.trim().split(' ').filter(n => n.length > 0);
+                                if (names.length === 0) return "W";
+                                if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                                return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                              })()}
+                            </AvatarFallback>
                         </Avatar>
-                        <div className="font-medium">{worker.name}</div>
+                        <div className="font-medium text-gray-900">{worker.name}</div>
                         </div>
                     </TableCell>
                     <TableCell>

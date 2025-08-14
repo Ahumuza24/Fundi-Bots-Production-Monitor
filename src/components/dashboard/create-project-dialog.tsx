@@ -33,6 +33,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { PlusCircle, Trash2, CalendarIcon, Loader2 } from "lucide-react";
+import { FileUpload } from "@/components/ui/file-upload";
 import {
   Select,
   SelectContent,
@@ -56,8 +57,8 @@ const projectSchema = z.object({
   name: z.string().min(1, "Project name is required."),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   description: z.string().min(1, "Description is required."),
-  imageUrl: z.string().url("Please enter a valid image URL."),
-  documentationUrl: z.string().url().optional().or(z.literal("")),
+  imageUrl: z.string().optional(),
+  documentationUrl: z.string().optional(),
   deadline: z.date({
     required_error: "A due date is required.",
   }),
@@ -71,6 +72,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
 
   const form = useForm<ProjectFormData>({
     resolver: zodResolver(projectSchema),
@@ -78,7 +81,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       name: "",
       quantity: 1,
       description: "",
-      imageUrl: "https://placehold.co/600x400.png",
+      imageUrl: "",
       documentationUrl: "",
       priority: "Medium",
       components: [{ name: "", process: "Assembly", quantityPerUnit: 1 }],
@@ -90,16 +93,38 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
     name: "components",
   });
 
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = error => reject(error);
+    });
+  };
+
   const onSubmit = async (data: ProjectFormData) => {
     setIsSubmitting(true);
     try {
       const now = new Date().toISOString();
+      
+      // Convert files to base64 if they exist
+      let imageUrl = data.imageUrl || "https://placehold.co/600x400.png";
+      let documentationUrl = data.documentationUrl;
+      
+      if (imageFile) {
+        imageUrl = await convertFileToBase64(imageFile);
+      }
+      
+      if (documentFile) {
+        documentationUrl = await convertFileToBase64(documentFile);
+      }
+      
       const newProject = {
         name: data.name,
         quantity: data.quantity,
         description: data.description,
-        imageUrl: data.imageUrl,
-        documentationUrl: data.documentationUrl || undefined,
+        imageUrl,
+        documentationUrl: documentationUrl || undefined,
         deadline: data.deadline.toISOString(),
         priority: data.priority,
         status: 'Not Started' as const,
@@ -125,6 +150,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       });
       
       form.reset();
+      setImageFile(null);
+      setDocumentFile(null);
       setOpen(false);
       onProjectCreated();
 
@@ -201,32 +228,36 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
               )}
             />
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                control={form.control}
-                name="imageUrl"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Image URL</FormLabel>
-                    <FormControl>
-                        <Input placeholder="https://example.com/image.png" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-                <FormField
-                control={form.control}
-                name="documentationUrl"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Documentation URL (Optional)</FormLabel>
-                    <FormControl>
-                        <Input placeholder="https://example.com/docs.pdf" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
+                <div>
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Project Image
+                  </label>
+                  <div className="mt-2">
+                    <FileUpload
+                      onFileSelect={(file) => setImageFile(file)}
+                      onFileRemove={() => setImageFile(null)}
+                      currentFile={imageFile}
+                      accept="image/*"
+                      placeholder="Upload project image"
+                      maxSize={5 * 1024 * 1024} // 5MB for images
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Documentation (Optional)
+                  </label>
+                  <div className="mt-2">
+                    <FileUpload
+                      onFileSelect={(file) => setDocumentFile(file)}
+                      onFileRemove={() => setDocumentFile(null)}
+                      currentFile={documentFile}
+                      accept=".pdf,.doc,.docx"
+                      placeholder="Upload documentation"
+                      maxSize={10 * 1024 * 1024} // 10MB for documents
+                    />
+                  </div>
+                </div>
              </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <FormField

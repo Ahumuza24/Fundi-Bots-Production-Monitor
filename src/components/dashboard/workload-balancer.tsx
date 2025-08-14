@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Scale, Users, Loader2, AlertTriangle } from "lucide-react";
@@ -273,17 +273,20 @@ export function WorkloadBalancer({ onBalanceComplete }: WorkloadBalancerProps) {
                     {workloadData.map((worker) => (
                       <TableRow key={worker.workerId}>
                         <TableCell>
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage 
-                                src={workers.find(w => w.id === worker.workerId)?.avatarUrl} 
-                                alt={worker.workerName} 
-                              />
-                              <AvatarFallback>{worker.workerName.charAt(0)}</AvatarFallback>
+                          <div className="flex items-center gap-3">
+                            <Avatar className="h-8 w-8 border-2 border-fundibots-cyan/20">
+                              <AvatarFallback className="bg-gradient-to-br from-fundibots-cyan to-fundibots-green text-white font-semibold text-xs">
+                                {(() => {
+                                  const names = worker.workerName.trim().split(' ').filter(n => n.length > 0);
+                                  if (names.length === 0) return "W";
+                                  if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+                                  return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+                                })()}
+                              </AvatarFallback>
                             </Avatar>
                             <div>
-                              <div className="font-medium">{worker.workerName}</div>
-                              <div className="text-sm text-muted-foreground">{worker.availability}</div>
+                              <div className="font-medium text-gray-900">{worker.workerName}</div>
+                              <div className="text-sm text-fundibots-cyan font-medium">{worker.availability}</div>
                             </div>
                           </div>
                         </TableCell>
