@@ -41,6 +41,7 @@ export default function WorkSessionsPage() {
 
   useEffect(() => {
     setProjectData(projects.find(p => p.id === selectedProjectId) || null);
+    setLogQuantities({});
   }, [selectedProjectId]);
 
   useEffect(() => {
