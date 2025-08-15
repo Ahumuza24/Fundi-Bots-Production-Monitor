@@ -593,7 +593,7 @@ export default function ReportsPage() {
                     </Select>
                   </div>
                   
-                  {reportType === 'custom' && (
+                  {(reportType as string) === 'custom' && (
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4" />
                       <DatePickerWithRange date={dateRange} setDate={setDateRange} />

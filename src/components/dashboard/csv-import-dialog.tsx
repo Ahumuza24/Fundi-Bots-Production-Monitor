@@ -34,7 +34,7 @@ interface CSVProject {
   description: string;
   deadline: string;
   priority: 'Low' | 'Medium' | 'High' | 'Critical';
-  components: string; // JSON string of components
+  components: any[]; // Parsed components array
 }
 
 interface CSVImportDialogProps {
@@ -70,7 +70,7 @@ export function CSVImportDialog({ onProjectsImported }: CSVImportDialogProps) {
     const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim());
     
     return lines.slice(1).map((line, index) => {
-      const values = [];
+      const values: string[] = [];
       let current = '';
       let inQuotes = false;
       

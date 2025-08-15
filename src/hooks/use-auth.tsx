@@ -43,8 +43,24 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 const getRoleFromEmail = (email: string | null): UserRole => {
   if (!email) return "guest";
-  if (sessionStorage.getItem(`role_${email}`) === 'admin') return 'admin';
+  
+  // Check both sessionStorage and localStorage for stored role
+  try {
+    const sessionRole = sessionStorage.getItem(`role_${email}`);
+    const localRole = localStorage.getItem(`role_${email}`);
+    
+    console.log(`Getting role for ${email}: sessionRole=${sessionRole}, localRole=${localRole}`);
+    
+    if (sessionRole === 'admin' || localRole === 'admin') return 'admin';
+    if (sessionRole === 'assembler' || localRole === 'assembler') return 'assembler';
+  } catch (error) {
+    console.warn('Error accessing storage for role:', error);
+  }
+  
+  // Fallback to email pattern matching
   if (email.endsWith("@admin.com")) return "admin";
+  
+  // Default to assembler
   return "assembler";
 };
 
@@ -75,10 +91,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (email: string, password: string) => {
     sessionStorage.removeItem('guest-user');
     await signInWithEmailAndPassword(auth, email, password);
+    // Note: The role will be determined by getRoleFromEmail when onAuthStateChanged fires
   };
 
   const signup = async (email: string, password: string, fullName: string, role: UserRole) => {
     sessionStorage.removeItem('guest-user');
+    
+    // Store the role BEFORE creating the user to ensure it's available when onAuthStateChanged fires
+    console.log(`Storing role ${role} for email ${email}`);
+    sessionStorage.setItem(`role_${email}`, role);
+    localStorage.setItem(`role_${email}`, role);
+    
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: fullName });
     
@@ -91,7 +114,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             id: updatedFirebaseUser.uid,
             name: fullName,
             email: email,
-            avatarUrl: `https://i.pravatar.cc/150?u=${email}`,
             skills: ['New Recruit'],
             availability: 'Pending',
             pastPerformance: 0,
@@ -100,19 +122,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         await setDoc(workerRef, newWorker);
     }
 
-    if(updatedFirebaseUser?.email) {
-      // In a real app, this would be stored in a database or as a custom claim.
-      // We use sessionStorage as a temporary mock for this.
-      sessionStorage.setItem(`role_${updatedFirebaseUser.email}`, role);
-    }
-    if (updatedFirebaseUser) {
-        setUser({
-          uid: updatedFirebaseUser.uid,
-          email: updatedFirebaseUser.email,
-          displayName: updatedFirebaseUser.displayName,
-          role: getRoleFromEmail(updatedFirebaseUser.email),
-        });
-    }
+    // The onAuthStateChanged will fire and set the user with the correct role
+    // No need to manually set the user here as it will be handled by the listener
   };
   
   const loginAsGuest = () => {
@@ -124,7 +135,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     sessionStorage.removeItem('guest-user');
-    // Note: we are not cleaning up role session storage on logout
+    // Note: we are not cleaning up role storage on logout
     // to allow role persistence for returning users in this mock setup.
     await signOut(auth);
     setUser(null);

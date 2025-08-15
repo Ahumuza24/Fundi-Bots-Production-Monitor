@@ -46,6 +46,8 @@ const NavLinks = () => {
     const { user } = useAuth();
     const pathname = usePathname()
     
+    console.log('NavLinks - Current user role:', user?.role, 'Email:', user?.email);
+    
     const getMenuItemClasses = (path: string, color: string) => {
       const isActive = pathname === path;
       return `h-12 px-4 rounded-lg transition-all duration-200 ${
@@ -220,6 +222,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     };
 
   const getRoleDisplayName = () => {
+    console.log('getRoleDisplayName - user role:', user?.role);
     if (user?.role === 'admin') return 'Project Lead';
     if (user?.role === 'assembler') return 'Assembler';
     return user?.displayName || 'My Account';

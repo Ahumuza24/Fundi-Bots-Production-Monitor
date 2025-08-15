@@ -17,10 +17,13 @@ export const projects: Omit<Project, 'id'>[] = [
     deadline: new Date(new Date().setDate(new Date().getDate() + 14)).toISOString(),
     status: 'In Progress',
     assignedWorkerIds: [],
+    priority: 'High',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     components: [
-      { id: 'C01', name: 'Microcontroller', quantityRequired: 100, quantityCompleted: 50 },
-      { id: 'C02', name: 'Resistor Pack', quantityRequired: 500, quantityCompleted: 350 },
-      { id: 'C03', name: 'Capacitor Kit', quantityRequired: 300, quantityCompleted: 120 },
+      { id: 'C01', name: 'Microcontroller', process: 'Assembly', quantityRequired: 100, quantityCompleted: 50 },
+      { id: 'C02', name: 'Resistor Pack', process: 'Soldering', quantityRequired: 500, quantityCompleted: 350 },
+      { id: 'C03', name: 'Capacitor Kit', process: 'Assembly', quantityRequired: 300, quantityCompleted: 120 },
     ]
   },
   {
@@ -32,10 +35,13 @@ export const projects: Omit<Project, 'id'>[] = [
     deadline: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString(),
     status: 'Not Started',
     assignedWorkerIds: [],
+    priority: 'Medium',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     components: [
-      { id: 'C04', name: 'Frame', quantityRequired: 50, quantityCompleted: 0 },
-      { id: 'C05', name: 'Armor Plating', quantityRequired: 200, quantityCompleted: 0 },
-      { id: 'C06', name: 'Wheel Assembly', quantityRequired: 200, quantityCompleted: 0 },
+      { id: 'C04', name: 'Frame', process: 'Mechanical Assembly', quantityRequired: 50, quantityCompleted: 0 },
+      { id: 'C05', name: 'Armor Plating', process: 'CNC Cutting', quantityRequired: 200, quantityCompleted: 0 },
+      { id: 'C06', name: 'Wheel Assembly', process: 'Assembly', quantityRequired: 200, quantityCompleted: 0 },
     ]
   },
   {
@@ -47,10 +53,13 @@ export const projects: Omit<Project, 'id'>[] = [
     deadline: new Date(new Date().setDate(new Date().getDate() + 7)).toISOString(),
     status: 'In Progress',
     assignedWorkerIds: [],
+    priority: 'Critical',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     components: [
-      { id: 'C07', name: 'Speaker Cone', quantityRequired: 400, quantityCompleted: 380 },
-      { id: 'C08', name: 'Amplifier Unit', quantityRequired: 200, quantityCompleted: 190 },
-      { id: 'C09', name: 'Housing', quantityRequired: 200, quantityCompleted: 200 },
+      { id: 'C07', name: 'Speaker Cone', process: 'Assembly', quantityRequired: 400, quantityCompleted: 380 },
+      { id: 'C08', name: 'Amplifier Unit', process: 'Soldering', quantityRequired: 200, quantityCompleted: 190 },
+      { id: 'C09', name: 'Housing', process: 'Final Assembly', quantityRequired: 200, quantityCompleted: 200 },
     ]
   },
   {
@@ -61,8 +70,11 @@ export const projects: Omit<Project, 'id'>[] = [
     deadline: new Date(new Date().setDate(new Date().getDate() + 60)).toISOString(),
     status: 'On Hold',
     assignedWorkerIds: [],
+    priority: 'Low',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     components: [
-        { id: 'C10', name: 'Core Fusion Reactor', quantityRequired: 1, quantityCompleted: 0},
+        { id: 'C10', name: 'Core Fusion Reactor', process: 'Advanced Assembly', quantityRequired: 1, quantityCompleted: 0},
     ]
   }
 ];

@@ -62,7 +62,6 @@ export function ProjectComments({ project, onCommentAdded }: ProjectCommentsProp
         id: `comment-${Date.now()}`,
         userId: user.uid,
         userName: user.displayName || user.email || 'Unknown User',
-        userAvatar: '', // No longer using external avatars
         content: data.content,
         timestamp: new Date().toISOString(),
       };
