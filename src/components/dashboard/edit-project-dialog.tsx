@@ -173,7 +173,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
       setDocumentFile(null);
       setImageRemoved(false);
       setDocumentRemoved(false);
-      
+
       const unsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
         const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
         setWorkers(workersData);
@@ -197,7 +197,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
     try {
       // Handle image upload/removal
       let imageUrl = project.imageUrl; // Start with existing image
-      
+
       if (imageFile) {
         // New file uploaded
         imageUrl = await convertFileToBase64(imageFile);
@@ -205,28 +205,29 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
         // File was explicitly removed
         imageUrl = "https://placehold.co/600x400.png";
       }
-      
-      // Handle document upload/removal
-      let documentationUrl: string | typeof deleteField | null = project.documentationUrl;
-      
-      if (documentFile) {
-        // New file uploaded
-        documentationUrl = await convertFileToBase64(documentFile);
-      } else if (documentRemoved) {
-        // File was explicitly removed - use deleteField to remove from Firestore
-        documentationUrl = deleteField();
-      }
 
+      // Handle document upload/removal
       const projectRef = doc(db, "projects", project.id);
-      
+
       // Prepare the update data
       const updatedProject: any = {
         ...data,
         imageUrl,
-        documentationUrl,
         deadline: data.deadline.toISOString(),
         updatedAt: new Date().toISOString(),
       };
+
+      // Handle document upload/removal separately
+      if (documentFile) {
+        // New file uploaded
+        updatedProject.documentationUrl = await convertFileToBase64(documentFile);
+      } else if (documentRemoved) {
+        // File was explicitly removed - use deleteField to remove from Firestore
+        updatedProject.documentationUrl = deleteField();
+      } else {
+        // Keep existing document if no changes
+        updatedProject.documentationUrl = project.documentationUrl;
+      }
 
       // Remove any undefined values from the data object
       Object.keys(updatedProject).forEach(key => {
@@ -241,7 +242,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
         title: "Project Updated",
         description: `Project "${data.name}" has been successfully updated.`,
       });
-      
+
       setImageFile(null);
       setDocumentFile(null);
       setImageRemoved(false);
@@ -273,7 +274,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
             Update project details, assign workers, and manage components.
           </DialogDescription>
         </DialogHeader>
-        
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
             console.log("Form validation errors:", errors);
@@ -318,7 +319,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                     )}
                   />
                 </div>
-                
+
                 <FormField
                   control={form.control}
                   name="description"
@@ -332,7 +333,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                     </FormItem>
                   )}
                 />
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
@@ -367,7 +368,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <FormField
                     control={form.control}
@@ -400,7 +401,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                               selected={field.value}
                               onSelect={field.onChange}
                               disabled={(date) =>
-                                date < new Date(new Date().setHours(0,0,0,0)) 
+                                date < new Date(new Date().setHours(0, 0, 0, 0))
                               }
                               initialFocus
                             />
@@ -459,7 +460,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                   />
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="workers" className="space-y-4">
                 <FormField
                   control={form.control}
@@ -491,10 +492,10 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                                         return checked
                                           ? field.onChange([...field.value, worker.id])
                                           : field.onChange(
-                                              field.value?.filter(
-                                                (value) => value !== worker.id
-                                              )
+                                            field.value?.filter(
+                                              (value) => value !== worker.id
                                             )
+                                          )
                                       }}
                                     />
                                   </FormControl>
@@ -534,7 +535,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                   )}
                 />
               </TabsContent>
-              
+
               <TabsContent value="components" className="space-y-4">
                 <div>
                   <h3 className="text-lg font-medium mb-2">Components & Processes</h3>
@@ -613,10 +614,10 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                     variant="outline"
                     size="sm"
                     className="mt-4"
-                    onClick={() => append({ 
+                    onClick={() => append({
                       id: `new-${Date.now()}`,
-                      name: "", 
-                      process: "Assembly", 
+                      name: "",
+                      process: "Assembly",
                       quantityRequired: 1,
                       quantityCompleted: 0
                     })}
@@ -627,7 +628,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                 </div>
               </TabsContent>
             </Tabs>
-            
+
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

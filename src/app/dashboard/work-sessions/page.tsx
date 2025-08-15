@@ -46,6 +46,21 @@ export default function WorkSessionsPage() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  // Helper function to create a default worker profile
+  const createDefaultWorker = useCallback((userId: string, status: 'Active' | 'Inactive', projectId?: string | null, timeLogged: number = 0): Worker => {
+    return {
+      id: userId,
+      name: user?.displayName || user?.email || 'Unknown Worker',
+      email: user?.email || '',
+      skills: [], // Can be updated later by admin
+      availability: '40 hours/week',
+      pastPerformance: 0.85, // Default performance rating
+      timeLoggedSeconds: timeLogged,
+      status: status,
+      activeProjectId: projectId ?? null
+    };
+  }, [user]);
+
   useEffect(() => {
     setLoading(true);
     const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
@@ -86,13 +101,32 @@ export default function WorkSessionsPage() {
       if (user?.uid && user.role === 'assembler') {
           const workerRef = doc(db, 'workers', user.uid);
           try {
-              await updateDoc(workerRef, { 
-                  status: status,
-                  activeProjectId: projectId ?? null
-              });
+              // First check if the worker document exists
+              const workerDoc = await getDoc(workerRef);
+              
+              if (!workerDoc.exists()) {
+                  // Create the worker document if it doesn't exist
+                  const newWorker = createDefaultWorker(user.uid, status, projectId);
+                  await setDoc(workerRef, newWorker);
+                  
+                  toast({
+                      title: "Worker Profile Created",
+                      description: "Your worker profile has been created automatically.",
+                  });
+              } else {
+                  // Update existing worker document
+                  await updateDoc(workerRef, { 
+                      status: status,
+                      activeProjectId: projectId ?? null
+                  });
+              }
           } catch (error) {
               console.error("Error updating worker status: ", error);
-              toast({ variant: 'destructive', title: "Error", description: "Could not update your status."});
+              toast({ 
+                  variant: 'destructive', 
+                  title: "Error", 
+                  description: "Could not update your status. Please try again."
+              });
           }
       }
   }, [user, toast]);
@@ -129,23 +163,36 @@ export default function WorkSessionsPage() {
       try {
         // Fetch the latest worker data to get the current time logged
         const workerDoc = await getDoc(workerRef);
-        const workerData = workerDoc.data() as Worker;
         
-        const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
+        if (!workerDoc.exists()) {
+            // Create worker document if it doesn't exist
+            const newWorker = createDefaultWorker(user.uid, 'Inactive', null, elapsedTime);
+            await setDoc(workerRef, newWorker);
+        } else {
+            const workerData = workerDoc.data() as Worker;
+            const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
 
-        await updateDoc(workerRef, { 
-            timeLoggedSeconds: newTimeLogged,
-            status: 'Inactive',
-            activeProjectId: null
-        });
+            await updateDoc(workerRef, { 
+                timeLoggedSeconds: newTimeLogged,
+                status: 'Inactive',
+                activeProjectId: null
+            });
+        }
 
         setSessionActive(false);
         setElapsedTime(0);
         
-        toast({ title: "Session Ended", description: `Total time: ${formatTime(elapsedTime)}` });
+        toast({ 
+            title: "Session Ended", 
+            description: `Total time: ${formatTime(elapsedTime)}` 
+        });
       } catch (error) {
           console.error("Error ending session: ", error);
-          toast({ variant: 'destructive', title: "Error", description: "Could not save session data."});
+          toast({ 
+              variant: 'destructive', 
+              title: "Error", 
+              description: "Could not save session data. Please try again."
+          });
       }
   };
 
