@@ -108,6 +108,7 @@ export default function ReportsPage() {
     from: startOfWeek(new Date()),
     to: endOfWeek(new Date()),
   });
+  const [isExporting, setIsExporting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -202,20 +203,254 @@ export default function ReportsPage() {
 
   const reportData = generateReportData();
 
-  const exportReport = (format: 'pdf' | 'csv' | 'excel') => {
-    // Mock export functionality
+  const exportReport = async (format: 'pdf' | 'csv' | 'excel') => {
+    if (isExporting) return;
+    
+    setIsExporting(true);
     toast({
       title: "Export Started",
       description: `Generating ${format.toUpperCase()} report...`,
     });
     
-    // In a real implementation, this would generate and download the actual file
-    setTimeout(() => {
+    try {
+      const data = generateReportData();
+      const reportTitle = getReportTitle();
+      
+      // Validate data before export
+      if (!data || (format === 'pdf' && (!projects.length && !workers.length))) {
+        throw new Error('No data available for export');
+      }
+      
+      // Add small delay to show loading state
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      if (format === 'csv' || format === 'excel') {
+        exportToCSV(data, reportTitle, format);
+      } else if (format === 'pdf') {
+        await exportToPDF(data, reportTitle);
+      }
+      
       toast({
         title: "Export Complete",
-        description: `Report exported as ${format.toUpperCase()} successfully.`,
+        description: `Report downloaded as ${format.toUpperCase()} successfully.`,
       });
-    }, 2000);
+    } catch (error) {
+      console.error('Export error:', error);
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: `Failed to export ${format.toUpperCase()} report. Please try again.`,
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const exportToCSV = (data: any, title: string, format: 'csv' | 'excel') => {
+    try {
+      // Create CSV content
+      const csvContent = [
+        [title],
+        ['Generated on:', new Date().toLocaleString()],
+        [], // Empty row
+        ['Summary Statistics'],
+        ['Metric', 'Value'],
+        ['Projects Completed', data.projectsCompleted || 0],
+        ['Total Parts Produced', data.totalPartsProduced || 0],
+        ['Average Efficiency', `${(data.averageEfficiency || 0).toFixed(1)}%`],
+        ['Total Work Hours', `${(data.totalWorkHours || 0).toFixed(1)}h`],
+        [], // Empty row
+      ];
+
+    // Add project data if available
+    if (projects.length > 0) {
+      csvContent.push(
+        ['Project Metrics'],
+        ['Project Name', 'Status', 'Progress (%)', 'Total Components', 'Completed Components', 'Deadline'],
+        ...projects.map(project => {
+          const progress = project.components.length > 0 
+            ? ((project.components.reduce((sum, c) => sum + c.quantityCompleted, 0) / 
+                project.components.reduce((sum, c) => sum + c.quantityRequired, 0)) * 100).toFixed(1)
+            : '0';
+          return [
+            project.name,
+            project.status,
+            progress,
+            project.components.reduce((sum, c) => sum + c.quantityRequired, 0),
+            project.components.reduce((sum, c) => sum + c.quantityCompleted, 0),
+            new Date(project.deadline).toLocaleDateString()
+          ];
+        }),
+        [] // Empty row
+      );
+    }
+
+    // Add worker data if available
+    if (workers.length > 0) {
+      csvContent.push(
+        ['Worker Performance'],
+        ['Worker Name', 'Skills', 'Availability', 'Performance', 'Status'],
+        ...workers.map(worker => [
+          worker.name,
+          worker.skills.join('; '),
+          worker.availability,
+          `${(worker.pastPerformance * 100).toFixed(1)}%`,
+          worker.status || 'Inactive'
+        ]),
+        [] // Empty row
+      );
+    }
+
+    // Add machine data for monitoring reports
+    if (reportType === 'monitoring') {
+      csvContent.push(
+        ['Machine Utilization'],
+        ['Machine Name', 'Type', 'Utilization (%)', 'Active Time (h)', 'Down Time (h)', 'Status'],
+        ...mockMachineData.map(machine => [
+          machine.machineName,
+          machine.type,
+          machine.utilizationPercentage,
+          machine.activeTime,
+          machine.downTime,
+          machine.utilizationPercentage > 80 ? 'Optimal' : 'Underutilized'
+        ])
+      );
+    }
+
+      // Convert to CSV string
+      const csvString = csvContent.map(row => 
+        row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
+      ).join('\n');
+
+      // Create and download file
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('CSV export error:', error);
+      throw new Error('Failed to generate CSV report');
+    }
+  };
+
+  const exportToPDF = async (data: any, title: string) => {
+    try {
+      const { jsPDF } = await import('jspdf');
+      
+      const doc = new jsPDF();
+      
+      // Add title
+      doc.setFontSize(20);
+      doc.text(title, 20, 20);
+      
+      // Add generation date
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, 30);
+      
+      let yPosition = 50;
+      
+      // Summary Statistics
+      doc.setFontSize(14);
+      doc.text('Summary Statistics', 20, yPosition);
+      yPosition += 15;
+      
+      // Add summary data as text
+      doc.setFontSize(10);
+      doc.text(`Projects Completed: ${data.projectsCompleted || 0}`, 25, yPosition);
+      yPosition += 10;
+      doc.text(`Total Parts Produced: ${(data.totalPartsProduced || 0).toLocaleString()}`, 25, yPosition);
+      yPosition += 10;
+      doc.text(`Average Efficiency: ${(data.averageEfficiency || 0).toFixed(1)}%`, 25, yPosition);
+      yPosition += 10;
+      doc.text(`Total Work Hours: ${(data.totalWorkHours || 0).toFixed(1)}h`, 25, yPosition);
+      yPosition += 20;
+    
+      // Project Details as text
+      if (projects.length > 0) {
+        doc.setFontSize(14);
+        doc.text('Project Details', 20, yPosition);
+        yPosition += 15;
+        
+        doc.setFontSize(10);
+        projects.slice(0, 10).forEach((project, index) => { // Limit to first 10 projects
+          const progress = project.components.length > 0 
+            ? ((project.components.reduce((sum, c) => sum + c.quantityCompleted, 0) / 
+                project.components.reduce((sum, c) => sum + c.quantityRequired, 0)) * 100).toFixed(1)
+            : '0';
+          
+          doc.text(`${index + 1}. ${project.name} - ${project.status} (${progress}% complete)`, 25, yPosition);
+          yPosition += 8;
+          
+          if (yPosition > 270) { // Add new page if needed
+            doc.addPage();
+            yPosition = 20;
+          }
+        });
+        
+        yPosition += 10;
+      }
+      
+      // Worker Performance as text
+      if (workers.length > 0) {
+        if (yPosition > 200) { // Add new page if needed
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        doc.setFontSize(14);
+        doc.text('Worker Performance', 20, yPosition);
+        yPosition += 15;
+        
+        doc.setFontSize(10);
+        workers.slice(0, 10).forEach((worker, index) => { // Limit to first 10 workers
+          doc.text(`${index + 1}. ${worker.name} - ${(worker.pastPerformance * 100).toFixed(1)}% efficiency`, 25, yPosition);
+          yPosition += 8;
+          
+          if (yPosition > 270) { // Add new page if needed
+            doc.addPage();
+            yPosition = 20;
+          }
+        });
+      }
+    
+      // Machine Utilization (for monitoring reports)
+      if (reportType === 'monitoring') {
+        if (yPosition > 200) { // Add new page if needed
+          doc.addPage();
+          yPosition = 20;
+        }
+        
+        doc.setFontSize(14);
+        doc.text('Machine Utilization', 20, yPosition);
+        yPosition += 15;
+        
+        doc.setFontSize(10);
+        mockMachineData.forEach((machine, index) => {
+          const status = machine.utilizationPercentage > 80 ? 'Optimal' : 'Underutilized';
+          doc.text(`${index + 1}. ${machine.machineName} (${machine.type}) - ${machine.utilizationPercentage}% - ${status}`, 25, yPosition);
+          yPosition += 8;
+          
+          if (yPosition > 270) { // Add new page if needed
+            doc.addPage();
+            yPosition = 20;
+          }
+        });
+      }
+      
+      // Save the PDF
+      doc.save(`${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`);
+      
+    } catch (error) {
+      console.error('PDF generation error:', error);
+      throw new Error('Failed to generate PDF report');
+    }
   };
 
   const getReportTitle = () => {
@@ -225,6 +460,65 @@ export default function ReportsPage() {
     const to = dateRange.to ? format(dateRange.to, 'MMM dd, yyyy') : from;
     
     return `${reportType.charAt(0).toUpperCase() + reportType.slice(1)} Report: ${from}${to !== from ? ` - ${to}` : ''}`;
+  };
+
+  const exportChartData = (chartData: any[], chartName: string, format: 'csv' | 'json') => {
+    try {
+      if (format === 'csv') {
+        const headers = Object.keys(chartData[0] || {});
+        const csvContent = [
+          [chartName],
+          ['Generated on:', new Date().toLocaleString()],
+          [],
+          headers,
+          ...chartData.map(row => headers.map(header => row[header]))
+        ];
+        
+        const csvString = csvContent.map(row => 
+          row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+        
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${chartName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else if (format === 'json') {
+        const jsonData = {
+          chartName,
+          generatedOn: new Date().toISOString(),
+          data: chartData
+        };
+        
+        const blob = new Blob([JSON.stringify(jsonData, null, 2)], { type: 'application/json' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${chartName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
+      
+      toast({
+        title: "Chart Data Exported",
+        description: `${chartName} data exported as ${format.toUpperCase()}.`,
+      });
+    } catch (error) {
+      console.error('Chart export error:', error);
+      toast({
+        variant: "destructive",
+        title: "Export Failed",
+        description: `Failed to export chart data.`,
+      });
+    }
   };
 
   if (loading) {
@@ -274,22 +568,20 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold tracking-tight">Reports & Analytics</h1>
           <p className="text-muted-foreground">Generate comprehensive production reports and live monitoring</p>
         </div>
-        {reportType !== 'monitoring' && (
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => exportReport('csv')}>
-              <Download className="h-4 w-4 mr-2" />
-              CSV
-            </Button>
-            <Button variant="outline" onClick={() => exportReport('excel')}>
-              <Download className="h-4 w-4 mr-2" />
-              Excel
-            </Button>
-            <Button variant="outline" onClick={() => exportReport('pdf')}>
-              <Download className="h-4 w-4 mr-2" />
-              PDF
-            </Button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => exportReport('csv')} disabled={isExporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'CSV'}
+          </Button>
+          <Button variant="outline" onClick={() => exportReport('excel')} disabled={isExporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'Excel'}
+          </Button>
+          <Button variant="outline" onClick={() => exportReport('pdf')} disabled={isExporting}>
+            <Download className="h-4 w-4 mr-2" />
+            {isExporting ? 'Exporting...' : 'PDF'}
+          </Button>
+        </div>
       </div>
 
       <Tabs value={reportType} onValueChange={(value: any) => setReportType(value)}>

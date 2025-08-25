@@ -102,7 +102,7 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
         title: "Template Created",
         description: `Template "${data.name}" has been successfully created.`,
       });
-      
+
       form.reset();
       setActiveTab("browse");
 
@@ -144,13 +144,13 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
             Browse existing templates or create new ones to speed up project creation.
           </DialogDescription>
         </DialogHeader>
-        
+
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="browse">Browse Templates</TabsTrigger>
             <TabsTrigger value="create">Create Template</TabsTrigger>
           </TabsList>
-          
+
           <TabsContent value="browse" className="space-y-4">
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -196,7 +196,7 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
                             </div>
                           </div>
                         )}
-                        <Button 
+                        <Button
                           onClick={() => handleUseTemplate(template)}
                           className="w-full mt-4"
                           size="sm"
@@ -211,7 +211,7 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
               </div>
             )}
           </TabsContent>
-          
+
           <TabsContent value="create">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -254,7 +254,7 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
                     </FormItem>
                   )}
                 />
-                
+
                 <DialogFooter>
                   <Button type="submit" disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
