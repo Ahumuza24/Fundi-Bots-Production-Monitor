@@ -1,6 +1,7 @@
 
 "use client"
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, Suspense } from 'react';
+import dynamic from 'next/dynamic';
 import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare, Database } from "lucide-react"
 import {
   Avatar,
@@ -37,6 +38,7 @@ import { projects as mockProjects, workers as mockWorkers } from '@/lib/mock-dat
 import type { Project, Worker } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { PageLoader, CardLoader } from '@/components/ui/loading-spinner';
 import { Loader2 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -47,41 +49,44 @@ export default function Dashboard() {
   const { user } = useAuth();
 
   useEffect(() => {
-    setLoading(true);
+    if (!user) return;
+    
+    let projectsLoaded = false;
+    let workersLoaded = false;
+    
+    const checkLoadingComplete = () => {
+      if (projectsLoaded && workersLoaded) {
+        setLoading(false);
+      }
+    };
     
     const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
-      setLoading(false);
+      projectsLoaded = true;
+      checkLoadingComplete();
     }, (error) => {
       console.error("Error fetching projects: ", error);
-       toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Could not fetch projects from Firestore.",
-        });
-       setLoading(false);
+      projectsLoaded = true;
+      checkLoadingComplete();
     });
 
     const workersUnsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
       const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
       setWorkers(workersData);
-      setLoading(false);
+      workersLoaded = true;
+      checkLoadingComplete();
     }, (error) => {
       console.error("Error fetching workers: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Could not fetch workers from Firestore.",
-      });
-      setLoading(false);
+      workersLoaded = true;
+      checkLoadingComplete();
     });
 
     return () => {
       projectsUnsubscribe();
       workersUnsubscribe();
     }
-  }, [toast]);
+  }, [user]);
   
   const handleSeedData = async () => {
     setLoading(true);
@@ -125,25 +130,33 @@ export default function Dashboard() {
   };
 
 
-  const chartData = projects.map(p => ({
-    name: p.name.split(' ')[0],
-    total: p.components.reduce((acc, c) => acc + c.quantityRequired, 0),
-    completed: p.components.reduce((acc, c) => acc + c.quantityCompleted, 0),
-  }));
+  // Memoize expensive calculations
+  const chartData = useMemo(() => 
+    projects.map(p => ({
+      name: p.name.split(' ')[0],
+      total: p.components.reduce((acc, c) => acc + c.quantityRequired, 0),
+      completed: p.components.reduce((acc, c) => acc + c.quantityCompleted, 0),
+    })), [projects]
+  );
 
-  const projectsInProgress = projects.filter(p => p.status === 'In Progress').length;
-  const totalUnitsCompleted = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityCompleted, 0);
-  const totalUnits = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityRequired, 0);
-  const teamProductivity = totalUnits > 0 ? ((totalUnitsCompleted / totalUnits) * 100).toFixed(0) : 0;
+  const dashboardStats = useMemo(() => {
+    const projectsInProgress = projects.filter(p => p.status === 'In Progress').length;
+    const totalUnitsCompleted = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityCompleted, 0);
+    const totalUnits = projects.flatMap(p => p.components).reduce((sum, c) => sum + c.quantityRequired, 0);
+    const teamProductivity = totalUnits > 0 ? ((totalUnitsCompleted / totalUnits) * 100).toFixed(0) : 0;
+    
+    return {
+      projectsInProgress,
+      totalUnitsCompleted,
+      totalUnits,
+      teamProductivity
+    };
+  }, [projects]);
   
-  const recentAssemblers = workers.slice(0, 4);
+  const recentAssemblers = useMemo(() => workers.slice(0, 4), [workers]);
 
   if (loading && projects.length === 0 && workers.length === 0) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    )
+    return <PageLoader />;
   }
 
   return (
@@ -159,7 +172,7 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-fundibots-primary">{projectsInProgress}</div>
+            <div className="text-2xl font-bold text-fundibots-primary">{dashboardStats.projectsInProgress}</div>
             <p className="text-xs text-muted-foreground">
               {projects.length} total projects
             </p>
@@ -175,9 +188,9 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-fundibots-green">{totalUnitsCompleted.toLocaleString()}</div>
+            <div className="text-2xl font-bold text-fundibots-green">{dashboardStats.totalUnitsCompleted.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">
-              out of {totalUnits.toLocaleString()} total units
+              out of {dashboardStats.totalUnits.toLocaleString()} total units
             </p>
           </CardContent>
         </Card>
@@ -189,7 +202,7 @@ export default function Dashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-fundibots-cyan">{teamProductivity}%</div>
+            <div className="text-2xl font-bold text-fundibots-cyan">{dashboardStats.teamProductivity}%</div>
             <p className="text-xs text-muted-foreground">
               Across all projects
             </p>

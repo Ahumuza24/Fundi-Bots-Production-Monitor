@@ -2,6 +2,7 @@
 "use client"
 
 import * as React from "react"
+import { memo, useMemo, useCallback } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { usePathname } from "next/navigation"
@@ -41,21 +42,20 @@ import {
 } from "@/components/ui/sidebar"
 
 import { useAuth } from "@/hooks/use-auth"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
-const NavLinks = () => {
+const NavLinks = memo(() => {
     const { user } = useAuth();
     const pathname = usePathname()
     
-    console.log('NavLinks - Current user role:', user?.role, 'Email:', user?.email);
-    
-    const getMenuItemClasses = (path: string, color: string) => {
+    const getMenuItemClasses = useCallback((path: string, color: string) => {
       const isActive = pathname === path;
       return `h-12 px-4 rounded-lg transition-all duration-200 ${
         isActive 
           ? `bg-gradient-to-r from-${color} to-fundibots-secondary text-white shadow-lg shadow-${color}/20 border border-${color}/20` 
           : `hover:bg-${color}/10 hover:text-${color} hover:border-${color}/20 border border-transparent`
       }`;
-    };
+    }, [pathname]);
     
     return (
       <SidebarMenu className="space-y-1">
@@ -210,36 +210,39 @@ const NavLinks = () => {
         </SidebarMenuItem>
       </SidebarMenu>
     )
-};
+});
 
-export function DashboardLayout({ children }: { children: React.ReactNode }) {
+NavLinks.displayName = 'NavLinks';
+
+export const DashboardLayout = memo(({ children }: { children: React.ReactNode }) => {
     const { user, logout } = useAuth();
     const router = useRouter();
 
-    const handleLogout = async () => {
+    const handleLogout = useCallback(async () => {
         await logout();
         router.push('/login');
-    };
+    }, [logout, router]);
 
-  const getRoleDisplayName = () => {
-    console.log('getRoleDisplayName - user role:', user?.role);
-    if (user?.role === 'admin') return 'Project Lead';
-    if (user?.role === 'assembler') return 'Assembler';
-    return user?.displayName || 'My Account';
-  }
+    const getRoleDisplayName = useMemo(() => {
+      if (user?.role === 'admin') return 'Project Lead';
+      if (user?.role === 'assembler') return 'Assembler';
+      return user?.displayName || 'My Account';
+    }, [user?.role, user?.displayName]);
   
-  const getInitials = (name?: string | null) => {
-    if (!name || name.trim() === "") return "U";
-    
-    const cleanName = name.trim();
-    const names = cleanName.split(' ').filter(n => n.length > 0);
-    
-    if (names.length === 0) return "U";
-    if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
-    
-    // Take first letter of first name and first letter of last name
-    return (names[0][0] + names[names.length - 1][0]).toUpperCase();
-  }
+    const getInitials = useCallback((name?: string | null) => {
+      if (!name || name.trim() === "") return "U";
+      
+      const cleanName = name.trim();
+      const names = cleanName.split(' ').filter(n => n.length > 0);
+      
+      if (names.length === 0) return "U";
+      if (names.length === 1) return names[0].substring(0, 2).toUpperCase();
+      
+      // Take first letter of first name and first letter of last name
+      return (names[0][0] + names[names.length - 1][0]).toUpperCase();
+    }, []);
+
+    const userInitials = useMemo(() => getInitials(user?.displayName), [getInitials, user?.displayName]);
 
   return (
     <SidebarProvider>
@@ -287,6 +290,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             </SidebarTrigger>
            </div>
             
+            {/* Notification Bell */}
+            <div className="flex items-center">
+              <NotificationBell />
+            </div>
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -295,7 +303,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 >
                   <Avatar className="h-8 w-8 border-2 border-fundibots-primary/20">
                     <AvatarFallback className="bg-gradient-to-br from-fundibots-primary to-fundibots-secondary text-white font-semibold text-sm">
-                      {getInitials(user?.displayName)}
+                      {userInitials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="hidden sm:flex flex-col items-start">
@@ -303,7 +311,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       {user?.displayName || 'User'}
                     </span>
                     <span className="text-xs text-fundibots-primary font-medium">
-                      {getRoleDisplayName()}
+                      {getRoleDisplayName}
                     </span>
                   </div>
                 </Button>
@@ -312,7 +320,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuLabel className="flex items-center gap-3 p-3">
                   <Avatar className="h-10 w-10 border-2 border-fundibots-primary/20">
                     <AvatarFallback className="bg-gradient-to-br from-fundibots-primary to-fundibots-secondary text-white font-semibold">
-                      {getInitials(user?.displayName)}
+                      {userInitials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col">
@@ -320,7 +328,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
                       {user?.displayName || 'User'}
                     </span>
                     <span className="text-xs text-fundibots-primary font-medium">
-                      {getRoleDisplayName()}
+                      {getRoleDisplayName}
                     </span>
                     <span className="text-xs text-gray-500">
                       {user?.email}
@@ -350,4 +358,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </SidebarInset>
     </SidebarProvider>
   )
-}
+});
+
+DashboardLayout.displayName = 'DashboardLayout';

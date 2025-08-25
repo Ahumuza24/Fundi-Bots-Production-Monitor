@@ -1,5 +1,6 @@
 "use client"
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { FileText, Download, Calendar, Filter, TrendingUp, Users, Package, Clock } from "lucide-react"
 import {
   Card,
@@ -201,7 +202,7 @@ export default function ReportsPage() {
     };
   };
 
-  const reportData = generateReportData();
+  const reportData = useMemo(() => generateReportData(), [projects, workers, reportType]);
 
   const exportReport = async (format: 'pdf' | 'csv' | 'excel') => {
     if (isExporting) return;

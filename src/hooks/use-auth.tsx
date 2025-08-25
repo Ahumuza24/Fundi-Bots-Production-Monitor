@@ -7,6 +7,8 @@ import {
   useState,
   useEffect,
   ReactNode,
+  useMemo,
+  useCallback,
 } from "react";
 import {
   onAuthStateChanged,
@@ -49,12 +51,10 @@ const getRoleFromEmail = (email: string | null): UserRole => {
     const sessionRole = sessionStorage.getItem(`role_${email}`);
     const localRole = localStorage.getItem(`role_${email}`);
     
-    console.log(`Getting role for ${email}: sessionRole=${sessionRole}, localRole=${localRole}`);
-    
     if (sessionRole === 'admin' || localRole === 'admin') return 'admin';
     if (sessionRole === 'assembler' || localRole === 'assembler') return 'assembler';
   } catch (error) {
-    console.warn('Error accessing storage for role:', error);
+    // Silent fail for storage access
   }
   
   // Fallback to email pattern matching
@@ -88,24 +88,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, []);
 
-  const login = async (email: string, password: string) => {
+  const login = useCallback(async (email: string, password: string) => {
     sessionStorage.removeItem('guest-user');
     await signInWithEmailAndPassword(auth, email, password);
-    // Note: The role will be determined by getRoleFromEmail when onAuthStateChanged fires
-  };
+  }, []);
 
-  const signup = async (email: string, password: string, fullName: string, role: UserRole) => {
+  const signup = useCallback(async (email: string, password: string, fullName: string, role: UserRole) => {
     sessionStorage.removeItem('guest-user');
     
-    // Store the role BEFORE creating the user to ensure it's available when onAuthStateChanged fires
-    console.log(`Storing role ${role} for email ${email}`);
+    // Store the role BEFORE creating the user
     sessionStorage.setItem(`role_${email}`, role);
     localStorage.setItem(`role_${email}`, role);
     
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: fullName });
     
-    // Refresh user to get displayName
     const updatedFirebaseUser = auth.currentUser;
 
     if (role === 'assembler' && updatedFirebaseUser) {
@@ -121,28 +118,32 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         await setDoc(workerRef, newWorker);
     }
-
-    // The onAuthStateChanged will fire and set the user with the correct role
-    // No need to manually set the user here as it will be handled by the listener
-  };
+  }, []);
   
-  const loginAsGuest = () => {
+  const loginAsGuest = useCallback(() => {
     const guestUser = { uid: 'guest', email: 'guest@example.com', role: 'guest' as UserRole, displayName: 'Guest User' };
     sessionStorage.setItem('guest-user', JSON.stringify(guestUser));
     setUser(guestUser);
     setLoading(false);
-  }
+  }, []);
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     sessionStorage.removeItem('guest-user');
-    // Note: we are not cleaning up role storage on logout
-    // to allow role persistence for returning users in this mock setup.
     await signOut(auth);
     setUser(null);
-  };
+  }, []);
+
+  const contextValue = useMemo(() => ({
+    user,
+    loading,
+    login,
+    signup,
+    logout,
+    loginAsGuest,
+  }), [user, loading, login, signup, logout, loginAsGuest]);
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, loginAsGuest }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
