@@ -297,7 +297,7 @@ export const DashboardLayout = memo(({ children }: { children: React.ReactNode }
         <div className="mt-auto p-4 border-t border-fundibots-primary/20 bg-gradient-subtle-orange">
           <div className="flex items-center justify-center group-data-[collapsible=icon]:px-2">
             <div className="text-xs text-fundibots-primary font-medium group-data-[collapsible=icon]:hidden">
-              Manufacturing Excellence
+              Accelerating Science Learning in Africa
             </div>
           </div>
         </div>
