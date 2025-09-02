@@ -1,7 +1,7 @@
 
 "use client"
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
-import { collection, onSnapshot, doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
+import { collection, onSnapshot, doc, updateDoc, getDoc, setDoc, addDoc } from "firebase/firestore";
 import { db } from '@/lib/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import {
@@ -20,31 +20,60 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
-import { Play, Pause, Square, Plus, Minus, Loader2, AlertCircle } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Play, Pause, Square, Loader2, AlertCircle, CheckCircle, Clock, Package } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import type { Project, ComponentSpec, Worker } from "@/lib/types"
+import type { Project, ComponentSpec, Worker, WorkSession } from "@/lib/types"
 import { cn } from '@/lib/utils';
 import { isBefore, addDays } from 'date-fns';
 import { WorkTimeCard } from '@/components/dashboard/work-time-display';
+
+type WorkflowStep = 'project' | 'component' | 'process' | 'session' | 'complete';
+
+interface SessionData {
+  projectId: string;
+  componentIds: string[];
+  process: string;
+  startTime: Date;
+  notes?: string;
+}
 
 export default function WorkSessionsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // Workflow state
+  const [currentStep, setCurrentStep] = useState<WorkflowStep>('project');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>([]);
+  const [selectedProcess, setSelectedProcess] = useState<string>('');
+  const [customProcess, setCustomProcess] = useState<string>('');
+  
+  // Session state
   const [sessionActive, setSessionActive] = useState(false);
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [logQuantities, setLogQuantities] = useState<Record<string, number>>({});
+  
+  // End session state
+  const [showEndDialog, setShowEndDialog] = useState(false);
+  const [completedQuantities, setCompletedQuantities] = useState<Record<string, number>>({});
+  const [sessionNotes, setSessionNotes] = useState<string>('');
+  
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -62,6 +91,24 @@ export default function WorkSessionsPage() {
     };
   }, [user]);
 
+  // Get selected project
+  const selectedProject = useMemo(() => {
+    return projects.find(p => p.id === selectedProjectId) || null;
+  }, [selectedProjectId, projects]);
+
+  // Get selected components
+  const selectedComponents = useMemo(() => {
+    if (!selectedProject) return [];
+    return selectedProject.components.filter(c => selectedComponentIds.includes(c.id));
+  }, [selectedProject, selectedComponentIds]);
+
+  // Get available processes for selected components
+  const availableProcesses = useMemo(() => {
+    if (selectedComponents.length === 0) return [];
+    const allProcesses = selectedComponents.flatMap(c => c.availableProcesses || []);
+    return [...new Set(allProcesses)];
+  }, [selectedComponents]);
+
   useEffect(() => {
     if (!user?.uid) return;
     
@@ -70,11 +117,6 @@ export default function WorkSessionsPage() {
     const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
-      if (projectsData.length > 0 && !selectedProjectId) {
-        // Find a project assigned to the current user if possible
-        const assignedProject = projectsData.find(p => user && p.assignedWorkerIds?.includes(user.uid));
-        setSelectedProjectId(assignedProject ? assignedProject.id : projectsData[0].id);
-      }
       setLoading(false);
     }, (error) => {
       console.error("Error fetching projects: ", error);
@@ -99,19 +141,7 @@ export default function WorkSessionsPage() {
       projectsUnsubscribe();
       workerUnsubscribe();
     };
-  }, [toast, selectedProjectId, user]);
-
-  const selectedProject = useMemo(() => {
-    return projects.find(p => p.id === selectedProjectId) || null;
-  }, [selectedProjectId, projects]);
-
-  const [projectData, setProjectData] = useState<Project | null>(selectedProject);
-
-  useEffect(() => {
-    const currentProject = projects.find(p => p.id === selectedProjectId) || null;
-    setProjectData(currentProject);
-    setLogQuantities({});
-  }, [selectedProjectId, projects]);
+  }, [toast, user]);
 
   const updateWorkerActiveProject = useCallback(async (projectId?: string | null) => {
       if (user?.uid && user.role === 'assembler') {
@@ -146,6 +176,7 @@ export default function WorkSessionsPage() {
       }
   }, [user, toast, createDefaultWorker]);
 
+  // Timer effect
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
     if (sessionActive) {
@@ -159,57 +190,171 @@ export default function WorkSessionsPage() {
       if (interval) clearInterval(interval);
     };
   }, [sessionActive, elapsedTime]);
+
+  // Workflow navigation functions
+  const handleProjectSelect = (projectId: string) => {
+    setSelectedProjectId(projectId);
+    updateWorkerActiveProject(projectId);
+    setCurrentStep('component');
+  };
+
+  const handleComponentSelect = (componentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedComponentIds(prev => [...prev, componentId]);
+    } else {
+      setSelectedComponentIds(prev => prev.filter(id => id !== componentId));
+    }
+  };
+
+  const handleProcessSelect = () => {
+    const finalProcess = selectedProcess === 'custom' ? customProcess : selectedProcess;
+    if (!finalProcess.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Process Required",
+        description: "Please select or enter a process.",
+      });
+      return;
+    }
+    setCurrentStep('session');
+  };
+
+  const resetWorkflow = () => {
+    setCurrentStep('project');
+    setSelectedProjectId(null);
+    setSelectedComponentIds([]);
+    setSelectedProcess('');
+    setCustomProcess('');
+    setSessionData(null);
+    setElapsedTime(0);
+    setSessionActive(false);
+    setCompletedQuantities({});
+    setSessionNotes('');
+  };
   
   const startSession = () => {
+    const finalProcess = selectedProcess === 'custom' ? customProcess : selectedProcess;
+    const newSessionData: SessionData = {
+      projectId: selectedProjectId!,
+      componentIds: selectedComponentIds,
+      process: finalProcess,
+      startTime: new Date(),
+    };
+    
+    setSessionData(newSessionData);
     setSessionActive(true);
-    updateWorkerActiveProject(selectedProjectId);
-  }
+    setElapsedTime(0);
+    
+    toast({
+      title: "Session Started",
+      description: `Working on ${selectedComponents.length} component(s) - ${finalProcess}`,
+    });
+  };
 
   const pauseSession = () => {
     setSessionActive(false);
-    // Keep the active project when pausing, don't clear it
-  }
-
-  const endSession = async () => {
-      if(!user || !projectData) return;
-      
-      const workerRef = doc(db, 'workers', user.uid);
-      
-      try {
-        // Fetch the latest worker data to get the current time logged
-        const workerDoc = await getDoc(workerRef);
-        
-        if (!workerDoc.exists()) {
-            // Create worker document if it doesn't exist
-            const newWorker = createDefaultWorker(user.uid, selectedProjectId, elapsedTime);
-            await setDoc(workerRef, newWorker);
-        } else {
-            const workerData = workerDoc.data() as Worker;
-            const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
-
-            await updateDoc(workerRef, { 
-                timeLoggedSeconds: newTimeLogged,
-                // Keep the active project when ending session
-            });
-        }
-
-        setSessionActive(false);
-        setElapsedTime(0);
-        
-        toast({ 
-            title: "Session Ended", 
-            description: `Total time: ${formatTime(elapsedTime)}` 
-        });
-      } catch (error) {
-          console.error("Error ending session: ", error);
-          toast({ 
-              variant: 'destructive', 
-              title: "Error", 
-              description: "Could not save session data. Please try again."
-          });
-      }
+    toast({
+      title: "Session Paused",
+      description: "You can resume or end your session.",
+    });
   };
 
+  const resumeSession = () => {
+    setSessionActive(true);
+    toast({
+      title: "Session Resumed",
+      description: "Timer is now running.",
+    });
+  };
+
+  const handleEndSession = () => {
+    setSessionActive(false);
+    // Initialize completed quantities to 0 for all selected components
+    const initialQuantities: Record<string, number> = {};
+    selectedComponentIds.forEach(id => {
+      initialQuantities[id] = 0;
+    });
+    setCompletedQuantities(initialQuantities);
+    setShowEndDialog(true);
+  };
+
+
+  const completeSession = async () => {
+    if (!user || !sessionData) return;
+
+    try {
+      const finalProcess = selectedProcess === 'custom' ? customProcess : selectedProcess;
+      
+      // Create work session record
+      const workSession: Omit<WorkSession, 'id'> = {
+        workerId: user.uid,
+        projectId: sessionData.projectId,
+        startTime: sessionData.startTime,
+        endTime: new Date(),
+        completedComponents: selectedComponentIds.map(id => ({
+          componentId: id,
+          quantity: completedQuantities[id] || 0
+        })),
+        process: finalProcess,
+        notes: sessionNotes,
+      };
+
+      // Save work session
+      await addDoc(collection(db, 'workSessions'), workSession);
+
+      // Update worker's total time
+      const workerRef = doc(db, 'workers', user.uid);
+      const workerDoc = await getDoc(workerRef);
+      
+      if (!workerDoc.exists()) {
+        const newWorker = createDefaultWorker(user.uid, selectedProjectId, elapsedTime);
+        await setDoc(workerRef, newWorker);
+      } else {
+        const workerData = workerDoc.data() as Worker;
+        const newTimeLogged = (workerData.timeLoggedSeconds || 0) + elapsedTime;
+        await updateDoc(workerRef, { 
+          timeLoggedSeconds: newTimeLogged,
+        });
+      }
+
+      // Update project component quantities
+      if (selectedProject) {
+        const projectRef = doc(db, 'projects', selectedProject.id);
+        const updatedComponents = selectedProject.components.map(component => {
+          const completedQty = completedQuantities[component.id] || 0;
+          if (completedQty > 0) {
+            return {
+              ...component,
+              quantityCompleted: Math.min(
+                component.quantityCompleted + completedQty,
+                component.quantityRequired
+              )
+            };
+          }
+          return component;
+        });
+
+        await updateDoc(projectRef, { components: updatedComponents });
+      }
+
+      toast({
+        title: "Session Completed",
+        description: `Work session saved successfully. Time: ${formatTime(elapsedTime)}`,
+      });
+
+      // Reset everything
+      setShowEndDialog(false);
+      resetWorkflow();
+
+    } catch (error) {
+      console.error("Error completing session: ", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not save session data. Please try again.",
+      });
+    }
+  };
 
   const formatTime = (seconds: number) => {
     const h = Math.floor(seconds / 3600).toString().padStart(2, '0');
@@ -218,70 +363,10 @@ export default function WorkSessionsPage() {
     return `${h}:${m}:${s}`;
   };
 
-  const handleLogComponent = async (componentId: string) => {
-    const quantity = logQuantities[componentId] || 0;
-    if (quantity <= 0 || !projectData) return;
-
-    const component = projectData.components.find(c => c.id === componentId);
-    if (!component) return;
-
-    const newCompleted = Math.min(component.quantityCompleted + quantity, component.quantityRequired);
-    
-    const projectRef = doc(db, 'projects', projectData.id);
-    const updatedComponents = projectData.components.map(c => 
-        c.id === componentId ? { ...c, quantityCompleted: newCompleted } : c
-    );
-
-    try {
-        await updateDoc(projectRef, { components: updatedComponents });
-        toast({
-            title: "Work Logged",
-            description: `Logged ${quantity} of ${component.name}.`,
-        });
-        setLogQuantities(prev => ({...prev, [componentId]: 0}));
-    } catch (error) {
-        console.error("Error logging work: ", error);
-        toast({
-            variant: "destructive",
-            title: "Error",
-            description: "Could not log work. Please try again.",
-        });
-    }
-  };
-
-  const handleQuantityChange = (componentId: string, value: number) => {
-    const component = projectData?.components.find(c => c.id === componentId);
-    if (!component) return;
-    const maxQuantity = component.quantityRequired - component.quantityCompleted;
-    setLogQuantities(prev => ({...prev, [componentId]: Math.max(0, Math.min(value, maxQuantity)) }));
-  }
-
-  const projectProgress = useMemo(() => {
-    if (!projectData) return 0;
-    const total = projectData.components.reduce((sum, c) => sum + c.quantityRequired, 0);
-    if (total === 0) return 0;
-    const completed = projectData.components.reduce((sum, c) => sum + c.quantityCompleted, 0);
-    return (completed / total) * 100;
-  }, [projectData]);
-
   const isProjectUrgent = (project: Project) => {
     const sevenDaysFromNow = addDays(new Date(), 7);
     return isBefore(new Date(project.deadline), sevenDaysFromNow);
-  }
-
-  const componentsByProcess = useMemo(() => {
-    if (!projectData) return {};
-    return projectData.components.reduce((acc, component) => {
-        const processes = component.availableProcesses || ['Uncategorized'];
-        processes.forEach(process => {
-            if (!acc[process]) {
-                acc[process] = [];
-            }
-            acc[process].push(component);
-        });
-        return acc;
-    }, {} as Record<string, ComponentSpec[]>);
-  }, [projectData]);
+  };
 
 
   if (loading) {
@@ -295,103 +380,222 @@ export default function WorkSessionsPage() {
   return (
     <div className="grid gap-4 md:gap-8 lg:grid-cols-2 xl:grid-cols-3">
       <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Select a Project</CardTitle>
-            <CardDescription>Choose the project you are currently working on to start a session.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Select onValueChange={(projectId) => {
-              setSelectedProjectId(projectId);
-              updateWorkerActiveProject(projectId);
-            }} value={selectedProjectId || ''} disabled={sessionActive}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a project" />
-              </SelectTrigger>
-              <SelectContent>
-                {projects.map((project) => (
-                  <SelectItem key={project.id} value={project.id}>
-                    <div className="flex items-center gap-2">
-                      {isProjectUrgent(project) && <AlertCircle className="h-4 w-4 text-destructive" />}
-                      <span>{project.name}</span>
-                      {isProjectUrgent(project) && <span className="text-xs text-destructive">(Urgent)</span>}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </CardContent>
-        </Card>
-
-        {projectData ? (
+        
+        {/* Step 1: Project Selection */}
+        {currentStep === 'project' && (
           <Card>
             <CardHeader>
-              <CardTitle>{projectData.name}</CardTitle>
-              <CardDescription>{projectData.description}</CardDescription>
+              <CardTitle>Step 1: Select a Project</CardTitle>
+              <CardDescription>Choose the project you want to work on.</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="mb-4">
-                <Label>Overall Project Progress</Label>
-                <div className="flex items-center gap-2">
-                  <Progress value={projectProgress} className="h-4" />
-                  <span>{projectProgress.toFixed(0)}%</span>
-                </div>
-              </div>
-              <Separator className="my-4" />
-              <div className={cn(!sessionActive && "opacity-50 pointer-events-none")}>
-                <Accordion type="single" collapsible className="w-full" defaultValue={Object.keys(componentsByProcess)[0]}>
-                    {Object.entries(componentsByProcess).map(([processName, components]) => (
-                        <AccordionItem value={processName} key={processName}>
-                            <AccordionTrigger className="text-base font-semibold">{processName}</AccordionTrigger>
-                            <AccordionContent>
-                                <div className="grid gap-6">
-                                    {components.map((component: ComponentSpec) => {
-                                    const componentProgress = (component.quantityCompleted / component.quantityRequired) * 100;
-                                    return (
-                                        <div key={component.id} className="grid gap-4">
-                                        <div>
-                                            <div className="flex justify-between items-center mb-1">
-                                            <Label htmlFor={`log-${component.id}`}>{component.name}</Label>
-                                            <span className="text-sm text-muted-foreground">{component.quantityCompleted} / {component.quantityRequired}</span>
-                                            </div>
-                                            <Progress value={componentProgress} />
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex items-center gap-1">
-                                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) - 1)} disabled={!sessionActive}>
-                                                <Minus className="h-4 w-4" />
-                                            </Button>
-                                            <Input
-                                                id={`log-${component.id}`}
-                                                type="number"
-                                                value={logQuantities[component.id] || 0}
-                                                onChange={(e) => handleQuantityChange(component.id, parseInt(e.target.value, 10))}
-                                                className="w-16 text-center"
-                                                disabled={!sessionActive}
-                                            />
-                                            <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => handleQuantityChange(component.id, (logQuantities[component.id] || 0) + 1)} disabled={!sessionActive}>
-                                                <Plus className="h-4 w-4" />
-                                            </Button>
-                                            </div>
-                                            <Button onClick={() => handleLogComponent(component.id)} disabled={!sessionActive || !logQuantities[component.id] || logQuantities[component.id] === 0}>
-                                            Log Work
-                                            </Button>
-                                        </div>
-                                        </div>
-                                    )
-                                    })}
-                                </div>
-                            </AccordionContent>
-                        </AccordionItem>
-                    ))}
-                </Accordion>
+              <div className="grid gap-4">
+                {projects.map((project) => (
+                  <div
+                    key={project.id}
+                    className="p-4 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleProjectSelect(project.id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          {isProjectUrgent(project) && <AlertCircle className="h-4 w-4 text-destructive" />}
+                          <h3 className="font-medium">{project.name}</h3>
+                          {isProjectUrgent(project) && <Badge variant="destructive" className="text-xs">Urgent</Badge>}
+                        </div>
+                        <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Due: {new Date(project.deadline).toLocaleDateString()}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{project.priority}</Badge>
+                    </div>
+                  </div>
+                ))}
               </div>
             </CardContent>
           </Card>
-        ) : (
+        )}
+
+        {/* Step 2: Component Selection */}
+        {currentStep === 'component' && selectedProject && (
           <Card>
+            <CardHeader>
+              <CardTitle>Step 2: Select Components</CardTitle>
+              <CardDescription>Choose which components you'll be working on for {selectedProject.name}.</CardDescription>
+            </CardHeader>
             <CardContent>
-              <p className="py-4 text-muted-foreground">Select a project to begin, or ask your Project Lead to create one.</p>
+              <div className="space-y-4">
+                {selectedProject.components.map((component) => {
+                  const progress = (component.quantityCompleted / component.quantityRequired) * 100;
+                  const isSelected = selectedComponentIds.includes(component.id);
+                  
+                  return (
+                    <div key={component.id} className="flex items-center space-x-3 p-3 border rounded-lg">
+                      <Checkbox
+                        id={component.id}
+                        checked={isSelected}
+                        onCheckedChange={(checked) => handleComponentSelect(component.id, checked as boolean)}
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-center mb-2">
+                          <Label htmlFor={component.id} className="font-medium">{component.name}</Label>
+                          <span className="text-sm text-muted-foreground">
+                            {component.quantityCompleted} / {component.quantityRequired}
+                          </span>
+                        </div>
+                        <Progress value={progress} className="h-2" />
+                        <div className="flex gap-1 mt-2">
+                          {component.availableProcesses?.map((process) => (
+                            <Badge key={process} variant="secondary" className="text-xs">
+                              {process}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setCurrentStep('project')}>
+                Back
+              </Button>
+              <Button 
+                onClick={() => setCurrentStep('process')} 
+                disabled={selectedComponentIds.length === 0}
+              >
+                Next: Select Process
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {/* Step 3: Process Selection */}
+        {currentStep === 'process' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Step 3: Select Process</CardTitle>
+              <CardDescription>What process will you be performing on the selected components?</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Available Processes</Label>
+                  <Select value={selectedProcess} onValueChange={setSelectedProcess}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Select a process" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProcesses.map((process) => (
+                        <SelectItem key={process} value={process}>
+                          {process}
+                        </SelectItem>
+                      ))}
+                      <SelectItem value="custom">Custom Process...</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {selectedProcess === 'custom' && (
+                  <div>
+                    <Label htmlFor="custom-process" className="text-sm font-medium">Custom Process</Label>
+                    <Input
+                      id="custom-process"
+                      placeholder="Enter custom process (e.g., CNC Machining, Painting, etc.)"
+                      value={customProcess}
+                      onChange={(e) => setCustomProcess(e.target.value)}
+                      className="mt-2"
+                    />
+                  </div>
+                )}
+
+                <div className="p-3 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Selected Components:</h4>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedComponents.map((component) => (
+                      <Badge key={component.id} variant="outline">
+                        {component.name}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between">
+              <Button variant="outline" onClick={() => setCurrentStep('component')}>
+                Back
+              </Button>
+              <Button onClick={handleProcessSelect}>
+                Start Work Session
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {/* Step 4: Active Session */}
+        {currentStep === 'session' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Work Session</CardTitle>
+              <CardDescription>
+                Working on {selectedComponents.length} component(s) - {selectedProcess === 'custom' ? customProcess : selectedProcess}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="p-4 bg-muted rounded-lg">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Package className="h-4 w-4" />
+                    <span className="font-medium">Project: {selectedProject?.name}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-sm">Process: {selectedProcess === 'custom' ? customProcess : selectedProcess}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    <span className="text-sm">Components: {selectedComponents.map(c => c.name).join(', ')}</span>
+                  </div>
+                </div>
+
+                <div className="text-center">
+                  <div className="text-4xl font-mono font-bold p-6 bg-muted rounded-lg">
+                    {formatTime(elapsedTime)}
+                  </div>
+                </div>
+
+                <div className="flex justify-center gap-2">
+                  {!sessionActive ? (
+                    <>
+                      <Button onClick={startSession}>
+                        <Play className="mr-2 h-4 w-4" /> Start Session
+                      </Button>
+                      <Button variant="outline" onClick={resetWorkflow}>
+                        Cancel
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button onClick={pauseSession} variant="outline">
+                        <Pause className="mr-2 h-4 w-4" /> Pause
+                      </Button>
+                      <Button onClick={handleEndSession} variant="destructive">
+                        <Square className="mr-2 h-4 w-4" /> End Session
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {!sessionActive && elapsedTime > 0 && (
+                  <div className="text-center">
+                    <Button onClick={resumeSession}>
+                      <Play className="mr-2 h-4 w-4" /> Resume Session
+                    </Button>
+                  </div>
+                )}
+              </div>
             </CardContent>
           </Card>
         )}
@@ -402,36 +606,89 @@ export default function WorkSessionsPage() {
           timeLoggedSeconds={currentWorker?.timeLoggedSeconds || 0} 
           title="Total Work Time"
         />
-        <Card>
-          <CardHeader>
-            <CardTitle>Session Timer</CardTitle>
-            <CardDescription>Track your work time for the selected project.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="text-4xl font-mono font-bold text-center p-6 bg-muted rounded-lg">
-              {formatTime(elapsedTime)}
-            </div>
-          </CardContent>
-          <CardFooter className="flex justify-center gap-2">
-            {!sessionActive ? (
-              <Button onClick={startSession} disabled={!selectedProject}>
-                <Play className="mr-2 h-4 w-4" /> Start Session
-              </Button>
-            ) : (
-              <Button onClick={pauseSession} variant="outline">
-                <Pause className="mr-2 h-4 w-4" /> Pause Session
-              </Button>
-            )}
-            <Button
-              onClick={endSession}
-              variant="destructive"
-              disabled={elapsedTime === 0 && !sessionActive}
-            >
-              <Square className="mr-2 h-4 w-4" /> End Session
-            </Button>
-          </CardFooter>
-        </Card>
+        
+        {currentStep !== 'project' && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Session Progress</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className={cn("h-4 w-4", currentStep !== 'project' ? "text-green-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", currentStep !== 'project' ? "text-green-700" : "text-muted-foreground")}>
+                    Project Selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className={cn("h-4 w-4", ['process', 'session'].includes(currentStep) ? "text-green-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", ['process', 'session'].includes(currentStep) ? "text-green-700" : "text-muted-foreground")}>
+                    Components Selected
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className={cn("h-4 w-4", currentStep === 'session' ? "text-green-500" : "text-muted-foreground")} />
+                  <span className={cn("text-sm", currentStep === 'session' ? "text-green-700" : "text-muted-foreground")}>
+                    Process Defined
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
+
+      {/* End Session Dialog */}
+      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Work Session</DialogTitle>
+            <DialogDescription>
+              Enter the quantity of components you completed during this session.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedComponents.map((component) => (
+              <div key={component.id} className="space-y-2">
+                <Label htmlFor={`qty-${component.id}`}>{component.name}</Label>
+                <Input
+                  id={`qty-${component.id}`}
+                  type="number"
+                  min="0"
+                  max={component.quantityRequired - component.quantityCompleted}
+                  value={completedQuantities[component.id] || 0}
+                  onChange={(e) => setCompletedQuantities(prev => ({
+                    ...prev,
+                    [component.id]: parseInt(e.target.value) || 0
+                  }))}
+                  placeholder="Quantity completed"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Remaining: {component.quantityRequired - component.quantityCompleted}
+                </p>
+              </div>
+            ))}
+            
+            <div className="space-y-2">
+              <Label htmlFor="session-notes">Session Notes (Optional)</Label>
+              <Textarea
+                id="session-notes"
+                placeholder="Add any notes about this work session..."
+                value={sessionNotes}
+                onChange={(e) => setSessionNotes(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowEndDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={completeSession}>
+              Complete Session
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

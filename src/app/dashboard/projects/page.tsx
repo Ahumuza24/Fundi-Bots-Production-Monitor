@@ -63,6 +63,7 @@ import { CloneProjectDialog } from "@/components/dashboard/clone-project-dialog"
 import { format } from "date-fns"
 import { Skeleton } from '@/components/ui/skeleton';
 import Link from "next/link";
+import { useAuth } from '@/hooks/use-auth';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -76,7 +77,10 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('all');
+  
+  const isAssembler = user?.role === 'assembler';
 
   const fetchProjects = useCallback(() => {
     setLoading(true);
@@ -164,23 +168,28 @@ export default function ProjectsPage() {
             Archived
           </TabsTrigger>
         </TabsList>
-        <div className="ml-auto flex items-center gap-2">
-          <CSVImportDialog onProjectsImported={() => {}} />
-          <ProjectTemplatesDialog onTemplateSelected={(template) => {
-            toast({
-              title: "Template Selected",
-              description: `Template "${template.name}" is ready to use.`,
-            });
-          }} />
-          <CreateProjectDialog onProjectCreated={() => {}} />
-        </div>
+        {!isAssembler && (
+          <div className="ml-auto flex items-center gap-2">
+            <CSVImportDialog onProjectsImported={() => {}} />
+            <ProjectTemplatesDialog onTemplateSelected={(template) => {
+              toast({
+                title: "Template Selected",
+                description: `Template "${template.name}" is ready to use.`,
+              });
+            }} />
+            <CreateProjectDialog onProjectCreated={() => {}} />
+          </div>
+        )}
       </div>
       <TabsContent value={activeTab}>
         <Card>
           <CardHeader>
             <CardTitle>Projects</CardTitle>
             <CardDescription>
-              Manage your projects and view their progress. Updates are shown in real-time.
+              {isAssembler 
+                ? "View available projects and their progress. Click on a project name to see details."
+                : "Manage your projects and view their progress. Updates are shown in real-time."
+              }
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -198,7 +207,7 @@ export default function ProjectsPage() {
                     Due Date
                   </TableHead>
                   <TableHead>
-                    <span className="sr-only">Actions</span>
+                    <span className="sr-only">{isAssembler ? 'View' : 'Actions'}</span>
                   </TableHead>
                 </TableRow>
               </TableHeader>
@@ -262,75 +271,83 @@ export default function ProjectsPage() {
                          {format(new Date(project.deadline), "PPP")}
                       </TableCell>
                       <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              aria-haspopup="true"
-                              size="icon"
-                              variant="ghost"
-                            >
-                              <MoreHorizontal className="h-4 w-4" />
-                              <span className="sr-only">Toggle menu</span>
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <EditProjectDialog 
-                              project={project} 
-                              onProjectUpdated={() => {}}
-                            >
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                Edit Project
-                              </DropdownMenuItem>
-                            </EditProjectDialog>
-                            <CloneProjectDialog 
-                              project={project} 
-                              onProjectCloned={() => {}}
-                            >
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                                Clone Project
-                              </DropdownMenuItem>
-                            </CloneProjectDialog>
-                            <DropdownMenuSub>
-                              <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
-                              <DropdownMenuSubContent>
-                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Not Started')}>Not Started</DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'In Progress')}>In Progress</DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'On Hold')}>On Hold</DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Completed')}>Completed</DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Archived')}>Archive</DropdownMenuItem>
-                              </DropdownMenuSubContent>
-                            </DropdownMenuSub>
-                            <DropdownMenuSeparator />
-                             <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <DropdownMenuItem
-                                  className="text-destructive"
-                                  onSelect={(e) => e.preventDefault()}
-                                >
-                                  Delete
+                        {!isAssembler ? (
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                aria-haspopup="true"
+                                size="icon"
+                                variant="ghost"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                                <span className="sr-only">Toggle menu</span>
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <EditProjectDialog 
+                                project={project} 
+                                onProjectUpdated={() => {}}
+                              >
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  Edit Project
                                 </DropdownMenuItem>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This action cannot be undone. This will permanently delete the project "{project.name}".
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    className="bg-destructive hover:bg-destructive/90"
-                                    onClick={() => handleDeleteProject(project.id)}
+                              </EditProjectDialog>
+                              <CloneProjectDialog 
+                                project={project} 
+                                onProjectCloned={() => {}}
+                              >
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                                  Clone Project
+                                </DropdownMenuItem>
+                              </CloneProjectDialog>
+                              <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>Change Status</DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Not Started')}>Not Started</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'In Progress')}>In Progress</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'On Hold')}>On Hold</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Completed')}>Completed</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => handleStatusChange(project.id, 'Archived')}>Archive</DropdownMenuItem>
+                                </DropdownMenuSubContent>
+                              </DropdownMenuSub>
+                              <DropdownMenuSeparator />
+                               <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <DropdownMenuItem
+                                    className="text-destructive"
+                                    onSelect={(e) => e.preventDefault()}
                                   >
                                     Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                                  </DropdownMenuItem>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This action cannot be undone. This will permanently delete the project "{project.name}".
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      className="bg-destructive hover:bg-destructive/90"
+                                      onClick={() => handleDeleteProject(project.id)}
+                                    >
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        ) : (
+                          <Button variant="ghost" size="sm" asChild>
+                            <Link href={`/dashboard/projects/${project.id}`}>
+                              View Details
+                            </Link>
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))

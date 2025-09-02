@@ -30,8 +30,8 @@ import type { Project, Worker } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, isValid } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ProjectComments } from '@/components/dashboard/project-comments';
 import { AddProcessDialog } from '@/components/dashboard/add-process-dialog';
+import { useAuth } from '@/hooks/use-auth';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -60,11 +60,13 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { toast } = useToast();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [loading, setLoading] = useState(true);
 
   const projectId = params.id as string;
+  const isAssembler = user?.role === 'assembler';
 
   useEffect(() => {
     if (!projectId) return;
@@ -257,7 +259,7 @@ export default function ProjectDetailPage() {
                     <TableHead>Required</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Progress</TableHead>
-                    <TableHead>Actions</TableHead>
+                    {!isAssembler && <TableHead>Actions</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -290,16 +292,18 @@ export default function ProjectDetailPage() {
                             <span className="text-sm">{componentProgress.toFixed(0)}%</span>
                           </div>
                         </TableCell>
-                        <TableCell>
-                          <AddProcessDialog 
-                            projectId={project.id}
-                            component={component}
-                            onProcessAdded={() => {
-                              // Refresh project data
-                              window.location.reload();
-                            }}
-                          />
-                        </TableCell>
+                        {!isAssembler && (
+                          <TableCell>
+                            <AddProcessDialog 
+                              projectId={project.id}
+                              component={component}
+                              onProcessAdded={() => {
+                                // Refresh project data
+                                window.location.reload();
+                              }}
+                            />
+                          </TableCell>
+                        )}
                       </TableRow>
                     );
                   })}
@@ -308,8 +312,26 @@ export default function ProjectDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Comments Section */}
-          <ProjectComments project={project} onCommentAdded={() => {}} />
+          {/* Comments Section - Only for admins */}
+          {!isAssembler && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4" />
+                  Project Comments
+                </CardTitle>
+                <CardDescription>
+                  Add comments and notes about this project
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-4 text-muted-foreground">
+                  <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>Comments feature available for project leads</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -378,11 +400,8 @@ export default function ProjectDetailPage() {
                           {worker.skills.length > 2 && ` +${worker.skills.length - 2} more`}
                         </div>
                       </div>
-                      <Badge 
-                        variant={worker.status === 'Active' ? 'default' : 'secondary'}
-                        className={worker.status === 'Active' ? 'bg-green-100 text-green-800' : ''}
-                      >
-                        {worker.status || 'Inactive'}
+                      <Badge variant="secondary">
+                        {worker.activeProjectId === project.id ? 'Working' : 'Available'}
                       </Badge>
                     </div>
                   ))}
