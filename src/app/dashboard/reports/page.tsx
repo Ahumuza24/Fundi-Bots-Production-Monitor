@@ -269,7 +269,7 @@ export default function ReportsPage() {
         ['Projects Completed', data.projectsCompleted || 0],
         ['Total Parts Produced', data.totalPartsProduced || 0],
         ['Average Efficiency', `${(data.averageEfficiency || 0).toFixed(1)}%`],
-        ['Total Work Hours', `${(data.totalWorkHours || 0).toFixed(1)}h`],
+        ['Total Work Hours', formatTime(Math.round((data.totalWorkHours || 0) * 3600))],
         [], // Empty row
       ];
 
@@ -300,12 +300,13 @@ export default function ReportsPage() {
     if (workers.length > 0) {
       csvContent.push(
         ['Worker Performance'],
-        ['Worker Name', 'Skills', 'Availability', 'Performance', 'Status'],
+        ['Worker Name', 'Skills', 'Availability', 'Performance', 'Time Logged', 'Status'],
         ...workers.map(worker => [
           worker.name,
           worker.skills.join('; '),
           worker.availability,
           `${(worker.pastPerformance * 100).toFixed(1)}%`,
+          formatTime(worker.timeLoggedSeconds || 0),
           worker.status || 'Inactive'
         ]),
         [] // Empty row
@@ -380,7 +381,7 @@ export default function ReportsPage() {
       yPosition += 10;
       doc.text(`Average Efficiency: ${(data.averageEfficiency || 0).toFixed(1)}%`, 25, yPosition);
       yPosition += 10;
-      doc.text(`Total Work Hours: ${(data.totalWorkHours || 0).toFixed(1)}h`, 25, yPosition);
+      doc.text(`Total Work Hours: ${formatTime(Math.round((data.totalWorkHours || 0) * 3600))}`, 25, yPosition);
       yPosition += 20;
     
       // Project Details as text
@@ -697,7 +698,7 @@ export default function ReportsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-fundibots-yellow">{reportData.totalWorkHours.toFixed(0)}h</div>
+            <div className="text-2xl font-bold text-fundibots-yellow">{formatTime(Math.round(reportData.totalWorkHours * 3600))}</div>
             <p className="text-xs text-muted-foreground">
               Logged time
             </p>
@@ -789,11 +790,13 @@ export default function ReportsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {reportData.workerPerformance.map((worker, index) => (
+              {reportData.workerPerformance.map((worker, index) => {
+                const actualWorker = workers.find(w => w.name === worker.name);
+                return (
                 <TableRow key={index}>
                   <TableCell className="font-medium">{worker.name}</TableCell>
                   <TableCell>{worker.efficiency.toFixed(1)}%</TableCell>
-                  <TableCell>{worker.hours.toFixed(1)}h</TableCell>
+                  <TableCell>{formatTime(actualWorker?.timeLoggedSeconds || 0)}</TableCell>
                   <TableCell>{worker.parts}</TableCell>
                   <TableCell>
                     <Badge 
@@ -808,7 +811,8 @@ export default function ReportsPage() {
                     </Badge>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </CardContent>
@@ -964,7 +968,7 @@ export default function ReportsPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold text-fundibots-yellow">{reportData.totalWorkHours.toFixed(0)}h</div>
+                    <div className="text-2xl font-bold text-fundibots-yellow">{formatTime(Math.round(reportData.totalWorkHours * 3600))}</div>
                     <p className="text-xs text-muted-foreground">
                       Logged time
                     </p>
@@ -1349,7 +1353,7 @@ export default function ReportsPage() {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-fundibots-yellow">{reportData.totalWorkHours.toFixed(0)}h</div>
+                <div className="text-2xl font-bold text-fundibots-yellow">{formatTime(Math.round(reportData.totalWorkHours * 3600))}</div>
                 <p className="text-xs text-muted-foreground">
                   Total hours logged
                 </p>
