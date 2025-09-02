@@ -87,7 +87,17 @@ function getProjectProgress(project: Project) {
 function formatTime(seconds: number = 0) {
   const h = Math.floor(seconds / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  return `${h}h ${m}m`;
+  const s = seconds % 60;
+  
+  if (h === 0 && m === 0) {
+    return `${s}s`;
+  }
+  
+  if (h === 0) {
+    return `${m}m ${s}s`;
+  }
+  
+  return `${h}h ${m}m ${s}s`;
 }
 
 interface ReportData {

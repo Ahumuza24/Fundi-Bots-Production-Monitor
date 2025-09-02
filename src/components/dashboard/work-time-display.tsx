@@ -13,12 +13,17 @@ export function WorkTimeDisplay({ timeLoggedSeconds, className, showIcon = true 
   const formatTime = (seconds: number = 0) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
     
-    if (hours === 0) {
-      return `${minutes}m`;
+    if (hours === 0 && minutes === 0) {
+      return `${secs}s`;
     }
     
-    return `${hours}h ${minutes}m`;
+    if (hours === 0) {
+      return `${minutes}m ${secs}s`;
+    }
+    
+    return `${hours}h ${minutes}m ${secs}s`;
   };
 
   const formatDetailedTime = (seconds: number = 0) => {
@@ -54,11 +59,12 @@ export function WorkTimeCard({ timeLoggedSeconds, title = "Time Logged" }: { tim
   const formatTime = (seconds: number = 0) => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
     
-    return { hours, minutes };
+    return { hours, minutes, seconds: secs };
   };
 
-  const { hours, minutes } = formatTime(timeLoggedSeconds);
+  const { hours, minutes, seconds: secs } = formatTime(timeLoggedSeconds);
 
   return (
     <Card>
@@ -68,10 +74,10 @@ export function WorkTimeCard({ timeLoggedSeconds, title = "Time Logged" }: { tim
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
-          {hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`}
+          {hours > 0 ? `${hours}h ${minutes}m ${secs}s` : minutes > 0 ? `${minutes}m ${secs}s` : `${secs}s`}
         </div>
         <p className="text-xs text-muted-foreground">
-          {timeLoggedSeconds > 0 ? `${Math.floor(timeLoggedSeconds / 3600)} hours total` : 'No time logged yet'}
+          {timeLoggedSeconds > 0 ? `${hours} hours, ${minutes} minutes, ${secs} seconds total` : 'No time logged yet'}
         </p>
       </CardContent>
     </Card>
