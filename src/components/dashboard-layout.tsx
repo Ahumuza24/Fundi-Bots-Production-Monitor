@@ -208,6 +208,26 @@ const NavLinks = memo(() => {
           </SidebarMenuButton>
           </Link>
         </SidebarMenuItem>
+        <SidebarMenuItem>
+          <Link href="/dashboard/settings">
+           <SidebarMenuButton 
+             asChild 
+             isActive={pathname === '/dashboard/settings'} 
+             tooltip="Settings"
+             size="lg"
+             className={`h-12 px-4 rounded-lg transition-all duration-200 border ${
+               pathname === '/dashboard/settings' 
+                 ? 'bg-gray-600 text-white shadow-lg shadow-gray-600/20 border-gray-600' 
+                 : 'hover:bg-gray-100 hover:text-gray-600 hover:border-gray-300 border-transparent'
+             }`}
+           >
+            <span>
+              <Settings className="h-5 w-5" />
+              <span className="group-data-[collapsible=icon]:hidden font-medium">Settings</span>
+            </span>
+          </SidebarMenuButton>
+          </Link>
+        </SidebarMenuItem>
       </SidebarMenu>
     )
 });

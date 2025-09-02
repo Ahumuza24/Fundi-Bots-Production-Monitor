@@ -54,7 +54,6 @@ import type { Project, Worker } from "@/lib/types";
 const componentSchema = z.object({
   id: z.string(),
   name: z.string().min(1, "Component name is required."),
-  process: z.string().min(1, "Process is required."),
   quantityRequired: z.coerce.number().min(0, "Quantity must be at least 0."),
   quantityCompleted: z.coerce.number().min(0, "Quantity must be at least 0."),
   imageUrl: z.string().optional(),
@@ -108,7 +107,6 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
       components: project.components?.map(component => ({
         id: component.id || "",
         name: component.name || "",
-        process: component.process || "",
         quantityRequired: component.quantityRequired || 0,
         quantityCompleted: component.quantityCompleted || 0,
         imageUrl: component.imageUrl || "",
@@ -131,7 +129,6 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
       components: project.components?.map(component => ({
         id: component.id || "",
         name: component.name || "",
-        process: component.process || "",
         quantityRequired: component.quantityRequired || 0,
         quantityCompleted: component.quantityCompleted || 0,
         imageUrl: component.imageUrl || "",
@@ -538,11 +535,11 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
 
               <TabsContent value="components" className="space-y-4">
                 <div>
-                  <h3 className="text-lg font-medium mb-2">Components & Processes</h3>
+                  <h3 className="text-lg font-medium mb-2">Components</h3>
                   <div className="space-y-4">
                     {fields.map((field, index) => (
                       <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md relative">
-                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 flex-grow">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow">
                           <FormField
                             control={form.control}
                             name={`components.${index}.name`}
@@ -556,19 +553,7 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={form.control}
-                            name={`components.${index}.process`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Process</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="e.g., Assembly" {...field} />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+
                           <FormField
                             control={form.control}
                             name={`components.${index}.quantityRequired`}
@@ -617,7 +602,6 @@ export function EditProjectDialog({ project, onProjectUpdated, children }: EditP
                     onClick={() => append({
                       id: `new-${Date.now()}`,
                       name: "",
-                      process: "Assembly",
                       quantityRequired: 1,
                       quantityCompleted: 0
                     })}

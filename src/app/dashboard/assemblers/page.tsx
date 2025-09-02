@@ -26,6 +26,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { WorkloadBalancer } from '@/components/dashboard/workload-balancer';
 import { PerformanceMonitor } from '@/components/dashboard/performance-monitor';
+import { WorkTimeDisplay } from '@/components/dashboard/work-time-display';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -106,7 +107,7 @@ export default function AssemblersPage() {
   }
   
   const getActiveProject = (worker: Worker): Project | undefined => {
-      if (worker.status === 'Active' && worker.activeProjectId) {
+      if (worker.activeProjectId) {
           return projects.find(p => p.id === worker.activeProjectId);
       }
       return getAssignedProject(worker.id);
@@ -133,7 +134,6 @@ export default function AssemblersPage() {
           <TableHeader>
             <TableRow>
               <TableHead>Assembler</TableHead>
-              <TableHead>Status</TableHead>
               <TableHead>Active Project</TableHead>
               <TableHead className="hidden md:table-cell">Progress</TableHead>
               <TableHead className="hidden sm:table-cell">Time Logged</TableHead>
@@ -152,7 +152,6 @@ export default function AssemblersPage() {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell><Skeleton className="h-6 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell className="hidden md:table-cell"><Skeleton className="h-4 w-full" /></TableCell>
                   <TableCell className="hidden sm:table-cell"><Skeleton className="h-4 w-20" /></TableCell>
@@ -184,11 +183,6 @@ export default function AssemblersPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                        <Badge variant={worker.status === 'Active' ? 'default' : 'outline'} className={worker.status === 'Active' ? 'bg-green-100 text-green-800' : ''}>
-                           {worker.status || 'Inactive'}
-                        </Badge>
-                    </TableCell>
-                    <TableCell>
                       {activeProject ? activeProject.name : <span className="text-muted-foreground">Unassigned</span>}
                     </TableCell>
                     <TableCell className="hidden md:table-cell">
@@ -200,7 +194,7 @@ export default function AssemblersPage() {
                       ) : <span className="text-muted-foreground">-</span>}
                     </TableCell>
                     <TableCell className="hidden sm:table-cell">
-                      {formatTime(worker.timeLoggedSeconds)}
+                      <WorkTimeDisplay timeLoggedSeconds={worker.timeLoggedSeconds} showIcon={false} />
                     </TableCell>
                   </TableRow>
                 )

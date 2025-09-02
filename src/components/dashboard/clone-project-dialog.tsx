@@ -257,7 +257,7 @@ export function CloneProjectDialog({ project, onProjectCloned, children }: Clone
               <div className="space-y-1">
                 {project.components.map((component, index) => (
                   <div key={index} className="text-sm text-muted-foreground">
-                    • {component.name} ({component.process})
+                    • {component.name} ({component.availableProcesses?.length || 0} processes available)
                   </div>
                 ))}
               </div>

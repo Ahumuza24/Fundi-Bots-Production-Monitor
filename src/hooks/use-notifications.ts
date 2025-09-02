@@ -109,13 +109,23 @@ export function useNotifications(realtime: boolean = true) {
       return;
     }
 
-    const unsubscribe = subscribeToNotifications(user.uid, (notificationsData) => {
-      setNotifications(notificationsData);
-      setUnreadCount(notificationsData.filter(n => !n.isRead).length);
-      setLoading(false);
-    });
+    try {
+      const unsubscribe = subscribeToNotifications(user.uid, (notificationsData) => {
+        setNotifications(notificationsData);
+        setUnreadCount(notificationsData.filter(n => !n.isRead).length);
+        setLoading(false);
+        setError(null);
+      });
 
-    return unsubscribe;
+      return unsubscribe;
+    } catch (err) {
+      console.error('Failed to subscribe to notifications:', err);
+      setError(err instanceof Error ? err : new Error('Subscription failed'));
+      setLoading(false);
+      
+      // Fallback to manual fetch
+      fetchNotifications();
+    }
   }, [user?.uid, realtime, fetchNotifications]);
 
   // Initial fetch for non-realtime mode

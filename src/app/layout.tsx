@@ -2,8 +2,12 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "sonner"
 import { AuthProvider } from '@/hooks/use-auth';
 import { PerformanceMonitor } from '@/components/performance-monitor';
+import { NotificationToast } from '@/components/notifications/notification-toast';
+import { NotificationProvider } from '@/contexts/notification-context';
+import { CacheDebug } from '@/components/debug/cache-debug';
 
 export const metadata: Metadata = {
   title: 'FundiFlow',
@@ -29,9 +33,14 @@ export default function RootLayout({
       <body className="font-body antialiased">
         {process.env.NODE_ENV === 'development' && <PerformanceMonitor />}
         <AuthProvider>
-          {children}
+          <NotificationProvider>
+            {children}
+            <NotificationToast />
+            <CacheDebug />
+          </NotificationProvider>
         </AuthProvider>
         <Toaster />
+        <SonnerToaster position="top-right" richColors />
       </body>
     </html>
   );

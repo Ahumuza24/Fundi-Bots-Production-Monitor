@@ -1,9 +1,10 @@
 export interface ComponentSpec {
   id: string;
   name: string;
-  process: string;
   quantityRequired: number;
   quantityCompleted: number;
+  availableProcesses: string[]; // Processes that can be performed on this component
+  completedProcesses: string[]; // Processes that have been completed
   imageUrl?: string;
   estimatedTimePerUnit?: number; // in minutes
 }
@@ -49,7 +50,7 @@ export interface ProjectTemplate {
   id: string;
   name: string;
   description: string;
-  components: Omit<ComponentSpec, 'id' | 'quantityRequired' | 'quantityCompleted'>[];
+  components: Omit<ComponentSpec, 'id' | 'quantityRequired' | 'quantityCompleted' | 'availableProcesses' | 'completedProcesses'>[];
   processSequence?: string[];
   estimatedDuration?: number; // in days
   createdAt: string;
@@ -64,7 +65,6 @@ export interface Worker {
   availability: string; // e.g., "40 hours/week"
   pastPerformance: number; // e.g., 0.95 for 95%
   timeLoggedSeconds: number;
-  status?: 'Active' | 'Inactive';
   activeProjectId?: string | null;
 }
 

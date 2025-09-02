@@ -31,6 +31,7 @@ import { useToast } from '@/hooks/use-toast';
 import { format, isValid } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProjectComments } from '@/components/dashboard/project-comments';
+import { AddProcessDialog } from '@/components/dashboard/add-process-dialog';
 
 function getProjectProgress(project: Project) {
   if (!project.components || project.components.length === 0) return 0;
@@ -252,10 +253,11 @@ export default function ProjectDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Component</TableHead>
-                    <TableHead>Process</TableHead>
+                    <TableHead>Available Processes</TableHead>
                     <TableHead>Required</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Progress</TableHead>
+                    <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -268,7 +270,17 @@ export default function ProjectDetailPage() {
                       <TableRow key={component.id}>
                         <TableCell className="font-medium">{component.name}</TableCell>
                         <TableCell>
-                          <Badge variant="secondary">{component.process}</Badge>
+                          {component.availableProcesses && component.availableProcesses.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {component.availableProcesses.map((process: string, index: number) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  {process}
+                                </Badge>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-sm">No processes defined</span>
+                          )}
                         </TableCell>
                         <TableCell>{component.quantityRequired.toLocaleString()}</TableCell>
                         <TableCell>{component.quantityCompleted.toLocaleString()}</TableCell>
@@ -277,6 +289,16 @@ export default function ProjectDetailPage() {
                             <Progress value={componentProgress} className="h-2 w-20" />
                             <span className="text-sm">{componentProgress.toFixed(0)}%</span>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <AddProcessDialog 
+                            projectId={project.id}
+                            component={component}
+                            onProcessAdded={() => {
+                              // Refresh project data
+                              window.location.reload();
+                            }}
+                          />
                         </TableCell>
                       </TableRow>
                     );

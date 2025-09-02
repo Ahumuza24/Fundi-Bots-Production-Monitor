@@ -46,10 +46,11 @@ import { collection, addDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { notifyProjectCreatedToAssemblers } from "@/lib/notification-triggers";
+import { useAuth } from "@/hooks/use-auth";
 
 const componentSchema = z.object({
   name: z.string().min(1, "Component name is required."),
-  process: z.string().min(1, "Process is required."),
   quantityPerUnit: z.coerce.number().min(1, "Quantity must be at least 1."),
 });
 
@@ -70,6 +71,7 @@ type ProjectFormData = z.infer<typeof projectSchema>;
 
 export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: () => void }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -84,7 +86,7 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
       imageUrl: "",
       documentationUrl: "",
       priority: "Medium",
-      components: [{ name: "", process: "Assembly", quantityPerUnit: 1 }],
+      components: [{ name: "", quantityPerUnit: 1 }],
     },
   });
 
@@ -92,6 +94,8 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
     control: form.control,
     name: "components",
   });
+
+
 
   const convertFileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -106,25 +110,24 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
     setIsSubmitting(true);
     try {
       const now = new Date().toISOString();
-      
+
       // Convert files to base64 if they exist
       let imageUrl = data.imageUrl || "https://placehold.co/600x400.png";
       let documentationUrl = data.documentationUrl;
-      
+
       if (imageFile) {
         imageUrl = await convertFileToBase64(imageFile);
       }
-      
+
       if (documentFile) {
         documentationUrl = await convertFileToBase64(documentFile);
       }
-      
-      const newProject = {
+
+      const newProject: any = {
         name: data.name,
         quantity: data.quantity,
         description: data.description,
         imageUrl,
-        documentationUrl: documentationUrl || undefined,
         deadline: data.deadline.toISOString(),
         priority: data.priority,
         status: 'Not Started' as const,
@@ -132,23 +135,40 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
         createdAt: now,
         updatedAt: now,
         components: data.components.map(c => ({
-            id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
-            name: c.name,
-            process: c.process,
-            quantityRequired: c.quantityPerUnit * data.quantity,
-            quantityCompleted: 0
+          id: c.name.toLowerCase().replace(/\s/g, '-'), // simple id generation
+          name: c.name,
+          quantityRequired: c.quantityPerUnit * data.quantity,
+          quantityCompleted: 0,
+          availableProcesses: [], // Assemblers will add processes when they work on components
+          completedProcesses: []
         })),
         comments: [],
         attachments: [],
       };
 
-      await addDoc(collection(db, "projects"), newProject);
+      // Only add documentationUrl if it has a value
+      if (documentationUrl) {
+        newProject.documentationUrl = documentationUrl;
+      }
+
+      const docRef = await addDoc(collection(db, "projects"), newProject);
+
+      // Send notifications to assemblers
+      try {
+        if (user?.uid) {
+          await notifyProjectCreatedToAssemblers(data.name, docRef.id, user.uid);
+          console.log("✅ Project creation notifications sent successfully");
+        }
+      } catch (notificationError) {
+        console.error("Failed to send project creation notifications:", notificationError);
+        // Don't fail the project creation if notifications fail
+      }
 
       toast({
         title: "Project Created",
         description: `Project "${data.name}" has been successfully created.`,
       });
-      
+
       form.reset();
       setImageFile(null);
       setDocumentFile(null);
@@ -227,111 +247,111 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 </FormItem>
               )}
             />
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Project Image
-                  </label>
-                  <div className="mt-2">
-                    <FileUpload
-                      onFileSelect={(file) => setImageFile(file)}
-                      onFileRemove={() => setImageFile(null)}
-                      currentFile={imageFile}
-                      accept="image/*"
-                      placeholder="Upload project image"
-                      maxSize={5 * 1024 * 1024} // 5MB for images
-                    />
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Project Image
+                </label>
+                <div className="mt-2">
+                  <FileUpload
+                    onFileSelect={(file) => setImageFile(file)}
+                    onFileRemove={() => setImageFile(null)}
+                    currentFile={imageFile}
+                    accept="image/*"
+                    placeholder="Upload project image"
+                    maxSize={5 * 1024 * 1024} // 5MB for images
+                  />
                 </div>
-                <div>
-                  <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Documentation (Optional)
-                  </label>
-                  <div className="mt-2">
-                    <FileUpload
-                      onFileSelect={(file) => setDocumentFile(file)}
-                      onFileRemove={() => setDocumentFile(null)}
-                      currentFile={documentFile}
-                      accept=".pdf,.doc,.docx"
-                      placeholder="Upload documentation"
-                      maxSize={10 * 1024 * 1024} // 10MB for documents
-                    />
-                  </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                  Documentation (Optional)
+                </label>
+                <div className="mt-2">
+                  <FileUpload
+                    onFileSelect={(file) => setDocumentFile(file)}
+                    onFileRemove={() => setDocumentFile(null)}
+                    currentFile={documentFile}
+                    accept=".pdf,.doc,.docx"
+                    placeholder="Upload documentation"
+                    maxSize={10 * 1024 * 1024} // 10MB for documents
+                  />
                 </div>
-             </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <FormField
-                    control={form.control}
-                    name="deadline"
-                    render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                        <FormLabel>Due Date</FormLabel>
-                        <Popover>
-                            <PopoverTrigger asChild>
-                            <FormControl>
-                                <Button
-                                variant={"outline"}
-                                className={cn(
-                                    "pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
-                                )}
-                                >
-                                {field.value ? (
-                                    format(field.value, "PPP")
-                                ) : (
-                                    <span>Pick a date</span>
-                                )}
-                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                                </Button>
-                            </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                date < new Date(new Date().setHours(0,0,0,0)) 
-                                }
-                                initialFocus
-                            />
-                            </PopoverContent>
-                        </Popover>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Priority</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="deadline"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Due Date</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select priority" />
-                          </SelectTrigger>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
                         </FormControl>
-                        <SelectContent>
-                          <SelectItem value="Low">Low</SelectItem>
-                          <SelectItem value="Medium">Medium</SelectItem>
-                          <SelectItem value="High">High</SelectItem>
-                          <SelectItem value="Critical">Critical</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-             </div>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value}
+                          onSelect={field.onChange}
+                          disabled={(date) =>
+                            date < new Date(new Date().setHours(0, 0, 0, 0))
+                          }
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="priority"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Priority</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select priority" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Low">Low</SelectItem>
+                        <SelectItem value="Medium">Medium</SelectItem>
+                        <SelectItem value="High">High</SelectItem>
+                        <SelectItem value="Critical">Critical</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div>
-              <h3 className="text-lg font-medium mb-2">Components & Processes</h3>
+              <h3 className="text-lg font-medium mb-2">Components</h3>
               <div className="space-y-4">
                 {fields.map((field, index) => (
                   <div key={field.id} className="flex items-end gap-4 p-4 border rounded-md relative">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 flex-grow">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 flex-grow">
                       <FormField
                         control={form.control}
                         name={`components.${index}.name`}
@@ -340,19 +360,6 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                             <FormLabel>Component Name</FormLabel>
                             <FormControl>
                               <Input placeholder="e.g., Microcontroller" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                       <FormField
-                        control={form.control}
-                        name={`components.${index}.process`}
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Process</FormLabel>
-                            <FormControl>
-                              <Input placeholder="e.g., Assembly" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -372,16 +379,16 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                         )}
                       />
                     </div>
-                     <Button
-                        type="button"
-                        variant="destructive"
-                        size="icon"
-                        onClick={() => remove(index)}
-                        className="mb-1"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        <span className="sr-only">Remove component</span>
-                      </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => remove(index)}
+                      className="mb-1"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Remove component</span>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -390,16 +397,16 @@ export function CreateProjectDialog({ onProjectCreated }: { onProjectCreated: ()
                 variant="outline"
                 size="sm"
                 className="mt-4"
-                onClick={() => append({ name: "", process: "Assembly", quantityPerUnit: 1 })}
+                onClick={() => append({ name: "", quantityPerUnit: 1 })}
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
                 Add Component
               </Button>
               <FormDescription className="mt-2 text-sm">
-                The total quantity required for each component will be automatically calculated by multiplying the project's total quantity by the component's quantity per unit.
+                Components will be available for assemblers to work on. Assemblers will define the processes when they start working on each component.
               </FormDescription>
             </div>
-            
+
             <DialogFooter>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

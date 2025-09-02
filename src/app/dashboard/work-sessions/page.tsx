@@ -35,9 +35,11 @@ import { useToast } from "@/hooks/use-toast"
 import type { Project, ComponentSpec, Worker } from "@/lib/types"
 import { cn } from '@/lib/utils';
 import { isBefore, addDays } from 'date-fns';
+import { WorkTimeCard } from '@/components/dashboard/work-time-display';
 
 export default function WorkSessionsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [currentWorker, setCurrentWorker] = useState<Worker | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [sessionActive, setSessionActive] = useState(false);
@@ -47,7 +49,7 @@ export default function WorkSessionsPage() {
   const { user } = useAuth();
 
   // Helper function to create a default worker profile
-  const createDefaultWorker = useCallback((userId: string, status: 'Active' | 'Inactive', projectId?: string | null, timeLogged: number = 0): Worker => {
+  const createDefaultWorker = useCallback((userId: string, projectId?: string | null, timeLogged: number = 0): Worker => {
     return {
       id: userId,
       name: user?.displayName || user?.email || 'Unknown Worker',
@@ -56,14 +58,16 @@ export default function WorkSessionsPage() {
       availability: '40 hours/week',
       pastPerformance: 0.85, // Default performance rating
       timeLoggedSeconds: timeLogged,
-      status: status,
       activeProjectId: projectId ?? null
     };
   }, [user]);
 
   useEffect(() => {
+    if (!user?.uid) return;
+    
     setLoading(true);
-    const unsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
+    
+    const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
       const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
       setProjects(projectsData);
       if (projectsData.length > 0 && !selectedProjectId) {
@@ -82,7 +86,19 @@ export default function WorkSessionsPage() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Listen to current worker data
+    const workerUnsubscribe = onSnapshot(doc(db, "workers", user.uid), (snapshot) => {
+      if (snapshot.exists()) {
+        setCurrentWorker({ id: snapshot.id, ...snapshot.data() } as Worker);
+      }
+    }, (error) => {
+      console.error("Error fetching worker data: ", error);
+    });
+
+    return () => {
+      projectsUnsubscribe();
+      workerUnsubscribe();
+    };
   }, [toast, selectedProjectId, user]);
 
   const selectedProject = useMemo(() => {
@@ -97,7 +113,7 @@ export default function WorkSessionsPage() {
     setLogQuantities({});
   }, [selectedProjectId, projects]);
 
-  const updateWorkerStatus = useCallback(async (status: 'Active' | 'Inactive', projectId?: string | null) => {
+  const updateWorkerActiveProject = useCallback(async (projectId?: string | null) => {
       if (user?.uid && user.role === 'assembler') {
           const workerRef = doc(db, 'workers', user.uid);
           try {
@@ -106,7 +122,7 @@ export default function WorkSessionsPage() {
               
               if (!workerDoc.exists()) {
                   // Create the worker document if it doesn't exist
-                  const newWorker = createDefaultWorker(user.uid, status, projectId);
+                  const newWorker = createDefaultWorker(user.uid, projectId);
                   await setDoc(workerRef, newWorker);
                   
                   toast({
@@ -116,20 +132,19 @@ export default function WorkSessionsPage() {
               } else {
                   // Update existing worker document
                   await updateDoc(workerRef, { 
-                      status: status,
                       activeProjectId: projectId ?? null
                   });
               }
           } catch (error) {
-              console.error("Error updating worker status: ", error);
+              console.error("Error updating worker active project: ", error);
               toast({ 
                   variant: 'destructive', 
                   title: "Error", 
-                  description: "Could not update your status. Please try again."
+                  description: "Could not update your active project. Please try again."
               });
           }
       }
-  }, [user, toast]);
+  }, [user, toast, createDefaultWorker]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
@@ -147,12 +162,12 @@ export default function WorkSessionsPage() {
   
   const startSession = () => {
     setSessionActive(true);
-    updateWorkerStatus('Active', selectedProjectId);
+    updateWorkerActiveProject(selectedProjectId);
   }
 
   const pauseSession = () => {
     setSessionActive(false);
-    updateWorkerStatus('Inactive', null);
+    // Keep the active project when pausing, don't clear it
   }
 
   const endSession = async () => {
@@ -166,7 +181,7 @@ export default function WorkSessionsPage() {
         
         if (!workerDoc.exists()) {
             // Create worker document if it doesn't exist
-            const newWorker = createDefaultWorker(user.uid, 'Inactive', null, elapsedTime);
+            const newWorker = createDefaultWorker(user.uid, selectedProjectId, elapsedTime);
             await setDoc(workerRef, newWorker);
         } else {
             const workerData = workerDoc.data() as Worker;
@@ -174,8 +189,7 @@ export default function WorkSessionsPage() {
 
             await updateDoc(workerRef, { 
                 timeLoggedSeconds: newTimeLogged,
-                status: 'Inactive',
-                activeProjectId: null
+                // Keep the active project when ending session
             });
         }
 
@@ -258,11 +272,13 @@ export default function WorkSessionsPage() {
   const componentsByProcess = useMemo(() => {
     if (!projectData) return {};
     return projectData.components.reduce((acc, component) => {
-        const process = component.process || 'Uncategorized';
-        if (!acc[process]) {
-            acc[process] = [];
-        }
-        acc[process].push(component);
+        const processes = component.availableProcesses || ['Uncategorized'];
+        processes.forEach(process => {
+            if (!acc[process]) {
+                acc[process] = [];
+            }
+            acc[process].push(component);
+        });
         return acc;
     }, {} as Record<string, ComponentSpec[]>);
   }, [projectData]);
@@ -285,7 +301,10 @@ export default function WorkSessionsPage() {
             <CardDescription>Choose the project you are currently working on to start a session.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Select onValueChange={setSelectedProjectId} value={selectedProjectId || ''} disabled={sessionActive}>
+            <Select onValueChange={(projectId) => {
+              setSelectedProjectId(projectId);
+              updateWorkerActiveProject(projectId);
+            }} value={selectedProjectId || ''} disabled={sessionActive}>
               <SelectTrigger>
                 <SelectValue placeholder="Select a project" />
               </SelectTrigger>
@@ -379,6 +398,10 @@ export default function WorkSessionsPage() {
       </div>
 
       <div className="grid auto-rows-max items-start gap-4 md:gap-8">
+        <WorkTimeCard 
+          timeLoggedSeconds={currentWorker?.timeLoggedSeconds || 0} 
+          title="Total Work Time"
+        />
         <Card>
           <CardHeader>
             <CardTitle>Session Timer</CardTitle>
