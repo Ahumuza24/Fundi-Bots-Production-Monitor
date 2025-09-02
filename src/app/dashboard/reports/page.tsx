@@ -54,25 +54,11 @@ import { DateRange } from "react-day-picker";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
-// Mock data for machine utilization
-const mockMachineData: MachineUtilization[] = [
-  { machineId: 'CNC-001', machineName: 'CNC Mill #1', type: 'CNC', utilizationPercentage: 85, activeTime: 6.8, downTime: 1.2 },
-  { machineId: 'LASER-001', machineName: 'Laser Cutter #1', type: 'Laser', utilizationPercentage: 92, activeTime: 7.4, downTime: 0.6 },
-  { machineId: 'ASM-001', machineName: 'Assembly Station #1', type: 'Assembly Station', utilizationPercentage: 78, activeTime: 6.2, downTime: 1.8 },
-  { machineId: 'ASM-002', machineName: 'Assembly Station #2', type: 'Assembly Station', utilizationPercentage: 65, activeTime: 5.2, downTime: 2.8 },
-];
+// Machine utilization data - will be calculated from actual work sessions
+const machineData: MachineUtilization[] = [];
 
-// Mock production rate data
+// Production rate data - will be calculated from actual work sessions
 const productionRateData = [
-  { time: '08:00', rate: 45 },
-  { time: '09:00', rate: 52 },
-  { time: '10:00', rate: 48 },
-  { time: '11:00', rate: 55 },
-  { time: '12:00', rate: 30 }, // lunch break
-  { time: '13:00', rate: 58 },
-  { time: '14:00', rate: 62 },
-  { time: '15:00', rate: 59 },
-  { time: '16:00', rate: 54 },
   { time: '17:00', rate: 48 },
 ];
 
@@ -318,7 +304,7 @@ export default function ReportsPage() {
       csvContent.push(
         ['Machine Utilization'],
         ['Machine Name', 'Type', 'Utilization (%)', 'Active Time (h)', 'Down Time (h)', 'Status'],
-        ...mockMachineData.map(machine => [
+        ...machineData.map(machine => [
           machine.machineName,
           machine.type,
           machine.utilizationPercentage,
@@ -444,7 +430,7 @@ export default function ReportsPage() {
         yPosition += 15;
         
         doc.setFontSize(10);
-        mockMachineData.forEach((machine, index) => {
+        machineData.forEach((machine, index) => {
           const status = machine.utilizationPercentage > 80 ? 'Optimal' : 'Underutilized';
           doc.text(`${index + 1}. ${machine.machineName} (${machine.type}) - ${machine.utilizationPercentage}% - ${status}`, 25, yPosition);
           yPosition += 8;
@@ -567,7 +553,7 @@ export default function ReportsPage() {
     sum + p.components.reduce((compSum, c) => compSum + c.quantityCompleted, 0), 0
   );
 
-  const machineUtilizationData = mockMachineData.map(machine => ({
+  const machineUtilizationData = machineData.map(machine => ({
     name: machine.machineName,
     utilization: machine.utilizationPercentage,
     type: machine.type,
@@ -1717,7 +1703,7 @@ export default function ReportsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {mockMachineData.map((machine) => (
+                  {machineData.map((machine) => (
                     <TableRow key={machine.machineId}>
                       <TableCell className="font-medium">{machine.machineName}</TableCell>
                       <TableCell>

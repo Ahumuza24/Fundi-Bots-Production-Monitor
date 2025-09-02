@@ -2,7 +2,7 @@
 "use client"
 import React, { useEffect, useState, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
-import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare, Database, Play } from "lucide-react"
+import { Activity, ArrowUpRight, CheckCircle, Package, Users, Hourglass, GanttChartSquare, Play } from "lucide-react"
 import {
   Avatar,
   AvatarFallback,
@@ -32,12 +32,13 @@ import {
   Tooltip,
 } from "recharts"
 import Link from "next/link"
-import { collection, getDocs, writeBatch, doc, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import { projects as mockProjects, workers as mockWorkers } from '@/lib/mock-data';
+// Removed mock data imports - using real Firestore data
 import type { Project, Worker } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { CreateProjectDialog } from '@/components/dashboard/create-project-dialog';
 import { PageLoader, CardLoader } from '@/components/ui/loading-spinner';
 import { Loader2 } from 'lucide-react';
 import { WorkTimeCard } from '@/components/dashboard/work-time-display';
@@ -89,46 +90,7 @@ export default function Dashboard() {
     }
   }, [user]);
   
-  const handleSeedData = async () => {
-    setLoading(true);
-    try {
-      const batch = writeBatch(db);
-
-      // Clear existing data (optional, but good for a clean seed)
-      const existingProjects = await getDocs(collection(db, "projects"));
-      existingProjects.forEach(doc => batch.delete(doc.ref));
-      const existingWorkers = await getDocs(collection(db, "workers"));
-      existingWorkers.forEach(doc => batch.delete(doc.ref));
-
-      mockProjects.forEach(project => {
-        const projectRef = doc(collection(db, "projects"));
-        batch.set(projectRef, { ...project, id: projectRef.id });
-      });
-      
-      mockWorkers.forEach(worker => {
-        const workerRef = doc(collection(db, "workers"));
-        batch.set(workerRef, { ...worker, id: workerRef.id });
-      });
-      
-      await batch.commit();
-      
-      toast({
-        title: "Success",
-        description: "Sample data has been seeded to Firestore.",
-      });
-      // Data will refresh via onSnapshot listeners
-      
-    } catch (error) {
-      console.error("Error seeding data: ", error);
-      toast({
-        variant: "destructive",
-        title: "Error Seeding Data",
-        description: "Could not write mock data to Firestore.",
-      });
-    } finally {
-        setLoading(false);
-    }
-  };
+  // Real-time data loading from Firestore - no mock data seeding needed
 
 
   // Memoize expensive calculations
@@ -411,14 +373,14 @@ export default function Dashboard() {
               <CardHeader>
                   <CardTitle>Welcome to FundiFlow!</CardTitle>
                   <CardDescription>
-                      It looks like there's no data in your database. You can seed the application with some sample data to get started.
+                      Get started by creating your first project and adding team members.
                   </CardDescription>
               </CardHeader>
               <CardContent>
-                  <Button onClick={handleSeedData} disabled={loading}>
-                      {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Database className="mr-2 h-4 w-4" />}
-                      Seed Sample Data
-                  </Button>
+                  <div className="flex gap-2">
+                    <CreateProjectDialog />
+                    <Button variant="outline">Add Workers</Button>
+                  </div>
               </CardContent>
           </Card>
         )}
@@ -518,7 +480,7 @@ export default function Dashboard() {
                 ))}
               </TableBody>
             </Table>
-             ) : <p className="text-sm text-muted-foreground">No assembler data available. Seed data or add assemblers manually.</p>}
+             ) : <p className="text-sm text-muted-foreground">No assembler data available. Add team members to get started.</p>}
           </CardContent>
         </Card>
       </div>

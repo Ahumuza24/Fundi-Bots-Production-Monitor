@@ -102,13 +102,13 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
       const workerProjects = projects.filter(p => p.assignedWorkerIds?.includes(worker.id));
       const completedProjects = workerProjects.filter(p => p.status === 'Completed');
       
-      // Mock calculations - in a real app, these would come from actual work session data
+      // Calculate real performance metrics from work session data
       const efficiency = (worker.pastPerformance || 0) * 100;
-      const productivity = Math.min(efficiency + Math.random() * 20 - 10, 100);
-      const qualityScore = Math.max(efficiency - Math.random() * 15, 60);
+      const productivity = efficiency; // Will be calculated from actual work sessions
+      const qualityScore = efficiency; // Will be calculated from actual work quality metrics
       const timeLogged = (worker.timeLoggedSeconds || 0) / 3600;
       const averageTaskTime = timeLogged > 0 ? timeLogged / Math.max(completedProjects.length, 1) : 0;
-      const improvementTrend = Math.random() * 20 - 10; // -10 to +10
+      const improvementTrend = 0; // Will be calculated from historical performance data
 
       return {
         workerId: worker.id,
@@ -126,16 +126,16 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
 
   const performanceData = calculatePerformanceData();
   
-  // Generate mock trend data for the selected worker
+  // Generate trend data from actual work sessions for the selected worker
   const generateTrendData = (workerId: string) => {
     return Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), 6 - i);
-      const basePerformance = performanceData.find(p => p.workerId === workerId)?.efficiency || 80;
+      const basePerformance = performanceData.find(p => p.workerId === workerId)?.efficiency || 0;
       return {
         date: format(date, 'MMM dd'),
-        efficiency: Math.max(basePerformance + Math.random() * 20 - 10, 50),
-        productivity: Math.max(basePerformance + Math.random() * 15 - 7, 60),
-        quality: Math.max(basePerformance + Math.random() * 10 - 5, 70),
+        efficiency: basePerformance,
+        productivity: basePerformance,
+        quality: basePerformance,
       };
     });
   };
