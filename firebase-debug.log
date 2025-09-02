@@ -1,0 +1,36 @@
+[debug] [2025-09-02T16:55:24.266Z] ----------------------------------------------------------------------
+[debug] [2025-09-02T16:55:24.279Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Fundi Bots\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only firestore:rules
+[debug] [2025-09-02T16:55:24.279Z] CLI Version:   14.15.1
+[debug] [2025-09-02T16:55:24.280Z] Platform:      win32
+[debug] [2025-09-02T16:55:24.280Z] Node Version:  v24.4.0
+[debug] [2025-09-02T16:55:24.280Z] Time:          Tue Sep 02 2025 19:55:24 GMT+0300 (East Africa Time)
+[debug] [2025-09-02T16:55:24.280Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-09-02T16:55:24.282Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-09-02T16:55:24.560Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-09-02T16:55:24.560Z] > authorizing via signed-in user (ahumuzacedric@gmail.com)
+[debug] [2025-09-02T16:55:24.560Z] [iam] checking project fundiflow for permissions ["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]
+[debug] [2025-09-02T16:55:24.561Z] Checked if tokens are valid: false, expires at: 1756549742134
+[debug] [2025-09-02T16:55:24.561Z] Checked if tokens are valid: false, expires at: 1756549742134
+[debug] [2025-09-02T16:55:24.561Z] > refreshing access token with scopes: []
+[debug] [2025-09-02T16:55:24.562Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-09-02T16:55:24.562Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-02T16:55:25.244Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-09-02T16:55:25.244Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2025-09-02T16:55:25.257Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-09-02T16:55:25.258Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-09-02T16:55:25.267Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/fundiflow:testIamPermissions [none]
+[debug] [2025-09-02T16:55:25.267Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/fundiflow:testIamPermissions x-goog-quota-user=projects/fundiflow
+[debug] [2025-09-02T16:55:25.267Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/fundiflow:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[debug] [2025-09-02T16:55:26.525Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/fundiflow:testIamPermissions 200
+[debug] [2025-09-02T16:55:26.525Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/fundiflow:testIamPermissions {"permissions":["datastore.indexes.create","datastore.indexes.delete","datastore.indexes.list","datastore.indexes.update","firebase.projects.get"]}
+[info] 
+[info] === Deploying to 'fundiflow'...
+[info] 
+[info] i  deploying firestore 
+[info] i  firestore: reading indexes from firestore.indexes.json... 
+[info] i  cloud.firestore: checking firestore.rules for compilation errors... 
+[debug] [2025-09-02T16:55:26.534Z] Checked if tokens are valid: true, expires at: 1756835723258
+[debug] [2025-09-02T16:55:26.534Z] Checked if tokens are valid: true, expires at: 1756835723258
+[debug] [2025-09-02T16:55:26.535Z] >>> [apiv2][query] POST https://firebaserules.googleapis.com/v1/projects/fundiflow:test [none]
+[debug] [2025-09-02T16:55:26.535Z] >>> [apiv2][body] POST https://firebaserules.googleapis.com/v1/projects/fundiflow:test [omitted]

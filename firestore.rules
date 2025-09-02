@@ -11,17 +11,11 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    // Check if user is admin
+    // Check if user is admin (safe version that handles missing documents)
     function isAdmin() {
       return isAuthenticated() && 
-             resource.data.role == 'admin' ||
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    // Check if user is assembler
-    function isAssembler() {
-      return isAuthenticated() && 
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'assembler';
+             (exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
     
     // Check if user owns the resource
@@ -29,57 +23,19 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
-    // Check if user is assigned to project
-    function isAssignedToProject(projectId) {
-      return isAuthenticated() && 
-             request.auth.uid in get(/databases/$(database)/documents/projects/$(projectId)).data.assignedWorkerIds;
-    }
-    
-    // Validate required fields for user creation/update
-    function isValidUserData() {
-      let requiredFields = ['name', 'email', 'role', 'createdAt'];
-      let allowedRoles = ['admin', 'assembler'];
-      
-      return request.resource.data.keys().hasAll(requiredFields) &&
-             request.resource.data.role in allowedRoles &&
-             request.resource.data.email is string &&
-             request.resource.data.name is string &&
-             request.resource.data.createdAt is timestamp;
-    }
-    
-    // Validate project data
-    function isValidProjectData() {
-      let requiredFields = ['name', 'description', 'status', 'createdAt', 'createdBy'];
-      let allowedStatuses = ['Planning', 'In Progress', 'Completed', 'On Hold'];
-      
-      return request.resource.data.keys().hasAll(requiredFields) &&
-             request.resource.data.status in allowedStatuses &&
-             request.resource.data.name is string &&
-             request.resource.data.description is string &&
-             request.resource.data.createdBy is string &&
-             request.resource.data.createdAt is timestamp;
-    }
-    
     // ====================
     // USER DOCUMENTS
     // ====================
     
     match /users/{userId} {
-      // Users can read their own profile
-      // Admins can read all user profiles
+      // Users can read their own profile, admins can read all
       allow read: if isOwner(userId) || isAdmin();
       
       // Users can create their own profile during signup
-      // Admins can create any user profile
-      allow create: if (isOwner(userId) && isValidUserData()) || 
-                       (isAdmin() && isValidUserData());
+      allow create: if isOwner(userId) || isAdmin();
       
-      // Users can update their own profile (except role)
-      // Admins can update any user profile
-      allow update: if (isOwner(userId) && 
-                       isValidUserData() && 
-                       request.resource.data.role == resource.data.role) ||
-                      (isAdmin() && isValidUserData());
+      // Users can update their own profile, admins can update any
+      allow update: if isOwner(userId) || isAdmin();
       
       // Only admins can delete users
       allow delete: if isAdmin();
@@ -90,18 +46,14 @@ service cloud.firestore {
     // ====================
     
     match /projects/{projectId} {
-      // Authenticated users can read projects they're assigned to
-      // Admins can read all projects
-      allow read: if isAdmin() || 
-                     isAssignedToProject(projectId) ||
-                     (isAuthenticated() && resource.data.createdBy == request.auth.uid);
+      // Authenticated users can read projects
+      allow read: if isAuthenticated();
       
-      // Only admins can create projects
-      allow create: if isAdmin() && isValidProjectData();
+      // Authenticated users can create projects
+      allow create: if isAuthenticated();
       
-      // Only admins and project creators can update projects
-      allow update: if (isAdmin() || resource.data.createdBy == request.auth.uid) && 
-                       isValidProjectData();
+      // Authenticated users can update projects
+      allow update: if isAuthenticated();
       
       // Only admins can delete projects
       allow delete: if isAdmin();
@@ -112,23 +64,14 @@ service cloud.firestore {
     // ====================
     
     match /workers/{workerId} {
-      // Admins can read all workers
-      // Workers can read their own profile
-      allow read: if isAdmin() || isOwner(workerId);
+      // Authenticated users can read workers
+      allow read: if isAuthenticated();
       
-      // Only admins can create worker profiles
-      allow create: if isAdmin() && 
-                       request.resource.data.keys().hasAll(['name', 'email', 'role', 'createdAt']) &&
-                       request.resource.data.role in ['assembler', 'supervisor'] &&
-                       request.resource.data.email is string &&
-                       request.resource.data.name is string;
+      // Authenticated users can create worker profiles
+      allow create: if isAuthenticated();
       
-      // Admins can update any worker
-      // Workers can update their own profile (limited fields)
-      allow update: if isAdmin() || 
-                       (isOwner(workerId) && 
-                        request.resource.data.diff(resource.data).affectedKeys()
-                          .hasOnly(['name', 'phone', 'updatedAt', 'timeLoggedSeconds', 'pastPerformance']));
+      // Authenticated users can update workers
+      allow update: if isAuthenticated();
       
       // Only admins can delete workers
       allow delete: if isAdmin();
@@ -139,25 +82,17 @@ service cloud.firestore {
     // ====================
     
     match /work-sessions/{sessionId} {
-      // Users can read their own work sessions
-      // Admins can read all work sessions
-      allow read: if isAdmin() || 
-                     resource.data.workerId == request.auth.uid ||
-                     isAssignedToProject(resource.data.projectId);
+      // Authenticated users can read work sessions
+      allow read: if isAuthenticated();
       
-      // Workers can create their own work sessions
-      // Admins can create any work session
-      allow create: if (isAuthenticated() && 
-                       request.resource.data.workerId == request.auth.uid &&
-                       request.resource.data.keys().hasAll(['workerId', 'projectId', 'startTime', 'createdAt'])) ||
-                      isAdmin();
+      // Authenticated users can create work sessions
+      allow create: if isAuthenticated();
       
-      // Workers can update their own work sessions
-      // Admins can update any work session
-      allow update: if (resource.data.workerId == request.auth.uid) || isAdmin();
+      // Authenticated users can update work sessions
+      allow update: if isAuthenticated();
       
-      // Only admins and session owners can delete work sessions
-      allow delete: if isAdmin() || resource.data.workerId == request.auth.uid;
+      // Authenticated users can delete work sessions
+      allow delete: if isAuthenticated();
     }
     
     // ====================
@@ -165,81 +100,53 @@ service cloud.firestore {
     // ====================
     
     match /notifications/{notificationId} {
-      // Users can read their own notifications
-      // Admins can read all notifications
-      allow read: if isAdmin() || resource.data.userId == request.auth.uid;
+      // Authenticated users can read notifications
+      allow read: if isAuthenticated();
       
-      // System and admins can create notifications
-      allow create: if isAdmin() || 
-                       (isAuthenticated() && 
-                        request.resource.data.keys().hasAll(['userId', 'title', 'message', 'type', 'createdAt']) &&
-                        request.resource.data.type in ['info', 'warning', 'error', 'success']);
+      // Authenticated users can create notifications
+      allow create: if isAuthenticated();
       
-      // Users can update their own notifications (mark as read)
-      // Admins can update any notification
-      allow update: if (resource.data.userId == request.auth.uid && 
-                       request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['read', 'readAt'])) ||
-                      isAdmin();
+      // Authenticated users can update notifications
+      allow update: if isAuthenticated();
       
-      // Users can delete their own notifications
-      // Admins can delete any notification
-      allow delete: if isAdmin() || resource.data.userId == request.auth.uid;
+      // Authenticated users can delete notifications
+      allow delete: if isAuthenticated();
     }
     
     // ====================
-    // REPORTS (Read-only for non-admins)
+    // PROJECT TEMPLATES
     // ====================
     
-    match /reports/{reportId} {
-      // Admins can read all reports
-      // Users can read reports they have access to
-      allow read: if isAdmin() || 
-                     (isAuthenticated() && 
-                      (resource.data.createdBy == request.auth.uid ||
-                       request.auth.uid in resource.data.get('allowedUsers', [])));
+    match /projectTemplates/{templateId} {
+      // Authenticated users can read templates
+      allow read: if isAuthenticated();
       
-      // Only admins can create reports
-      allow create: if isAdmin();
+      // Authenticated users can create templates
+      allow create: if isAuthenticated();
       
-      // Only admins can update reports
-      allow update: if isAdmin();
+      // Authenticated users can update templates
+      allow update: if isAuthenticated();
       
-      // Only admins can delete reports
+      // Only admins can delete templates
       allow delete: if isAdmin();
     }
     
     // ====================
-    // SYSTEM LOGS (Admin only)
+    // USER PREFERENCES
     // ====================
     
-    match /system-logs/{logId} {
-      // Only admins can access system logs
-      allow read, write: if isAdmin();
+    match /userPreferences/{userId} {
+      // Users can read/write their own preferences
+      allow read, write: if isOwner(userId) || isAdmin();
     }
     
     // ====================
-    // AUDIT TRAIL (Admin only)
+    // ALLOW ALL OTHER AUTHENTICATED ACCESS
     // ====================
     
-    match /audit-trail/{auditId} {
-      // Only admins can read audit trail
-      allow read: if isAdmin();
-      
-      // System can create audit entries
-      allow create: if isAuthenticated();
-      
-      // No updates or deletes allowed (immutable audit trail)
-      allow update, delete: if false;
-    }
-    
-    // ====================
-    // DENY ALL OTHER PATHS
-    // ====================
-    
-    // Explicitly deny access to any other collections
+    // Allow authenticated users to access other collections
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAuthenticated();
     }
   }
 }

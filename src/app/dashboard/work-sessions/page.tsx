@@ -615,8 +615,8 @@ export default function WorkSessionsPage() {
             <CardContent>
               <div className="space-y-3">
                 <div className="flex items-center gap-2">
-                  <CheckCircle className={cn("h-4 w-4", currentStep !== 'project' ? "text-green-500" : "text-muted-foreground")} />
-                  <span className={cn("text-sm", currentStep !== 'project' ? "text-green-700" : "text-muted-foreground")}>
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-700">
                     Project Selected
                   </span>
                 </div>

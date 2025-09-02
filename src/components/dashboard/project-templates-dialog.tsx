@@ -90,7 +90,7 @@ export function ProjectTemplatesDialog({ onTemplateSelected }: ProjectTemplatesD
         description: data.description,
         estimatedDuration: data.estimatedDuration,
         components: [
-          { name: "Main Component", process: "Assembly", estimatedTimePerUnit: 30 }
+          { name: "Main Component", estimatedTimePerUnit: 30 }
         ],
         processSequence: ["Assembly", "Testing", "Packaging"],
         createdAt: new Date().toISOString(),

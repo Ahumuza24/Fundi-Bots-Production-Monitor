@@ -50,6 +50,13 @@ export default function Dashboard() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const handleProjectCreated = () => {
+    toast({
+      title: "Project Created",
+      description: "Your new project has been created successfully.",
+    });
+  };
+
   useEffect(() => {
     if (!user) return;
     
@@ -378,7 +385,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                   <div className="flex gap-2">
-                    <CreateProjectDialog />
+                    <CreateProjectDialog onProjectCreated={handleProjectCreated} />
                     <Button variant="outline">Add Workers</Button>
                   </div>
               </CardContent>

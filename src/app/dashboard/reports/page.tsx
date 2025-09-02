@@ -293,7 +293,7 @@ export default function ReportsPage() {
           worker.availability,
           `${(worker.pastPerformance * 100).toFixed(1)}%`,
           formatTime(worker.timeLoggedSeconds || 0),
-          worker.status || 'Inactive'
+          worker.activeProjectId ? 'Active' : 'Inactive'
         ]),
         [] // Empty row
       );
@@ -532,7 +532,7 @@ export default function ReportsPage() {
 
   // Monitoring calculations
   const activeProjects = projects.filter(p => p.status === 'In Progress');
-  const activeWorkers = workers.filter(w => w.status === 'Active');
+  const activeWorkers = workers.filter(w => w.activeProjectId);
   const urgentProjects = projects.filter(p => {
     const deadline = new Date(p.deadline);
     const now = new Date();

@@ -54,7 +54,7 @@ interface CreateProjectFormProps {
 
 export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProps) {
   const { user } = useAuth();
-  const { notifyProjectCreated } = useNotificationActions();
+  const { notifyProjectCreatedToAssemblers } = useNotificationActions();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<ProjectFormData>({
@@ -88,7 +88,7 @@ export function CreateProjectForm({ onSuccess, onCancel }: CreateProjectFormProp
       const docRef = await addDoc(collection(db, 'projects'), projectData);
       
       // Send notification
-      await notifyProjectCreated(data.name, docRef.id);
+      await notifyProjectCreatedToAssemblers(data.name, docRef.id);
       
       toast.success('Project created successfully!', {
         description: `${data.name} has been added to your projects.`,
