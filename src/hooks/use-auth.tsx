@@ -19,7 +19,7 @@ import {
   User as FirebaseUser,
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc } from "firebase/firestore";
 import type { Worker } from "@/lib/types";
 
 
@@ -43,24 +43,12 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getRoleFromEmail = (email: string | null): UserRole => {
-  if (!email) return "guest";
-  
-  // Check both sessionStorage and localStorage for stored role
-  try {
-    const sessionRole = sessionStorage.getItem(`role_${email}`);
-    const localRole = localStorage.getItem(`role_${email}`);
-    
-    if (sessionRole === 'admin' || localRole === 'admin') return 'admin';
-    if (sessionRole === 'assembler' || localRole === 'assembler') return 'assembler';
-  } catch (error) {
-    // Silent fail for storage access
+const getRoleFromFirestore = async (uid: string): Promise<UserRole> => {
+  const userDocRef = doc(db, "users", uid);
+  const userDoc = await getDoc(userDocRef);
+  if (userDoc.exists()) {
+    return userDoc.data().role || "assembler";
   }
-  
-  // Fallback to email pattern matching
-  if (email.endsWith("@admin.com")) return "admin";
-  
-  // Default to assembler
   return "assembler";
 };
 
@@ -69,9 +57,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const role = getRoleFromEmail(firebaseUser.email);
+        const role = await getRoleFromFirestore(firebaseUser.uid);
         setUser({
           uid: firebaseUser.uid,
           email: firebaseUser.email,
@@ -96,19 +84,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const signup = useCallback(async (email: string, password: string, fullName: string, role: UserRole) => {
     sessionStorage.removeItem('guest-user');
     
-    // Store the role BEFORE creating the user
-    sessionStorage.setItem(`role_${email}`, role);
-    localStorage.setItem(`role_${email}`, role);
-    
     const userCredential = await createUserWithEmailAndPassword(auth, email, password);
     await updateProfile(userCredential.user, { displayName: fullName });
     
-    const updatedFirebaseUser = auth.currentUser;
+    const userDocRef = doc(db, "users", userCredential.user.uid);
+    await setDoc(userDocRef, { role: role, email: email, name: fullName });
 
-    if (role === 'assembler' && updatedFirebaseUser) {
-        const workerRef = doc(db, "workers", updatedFirebaseUser.uid);
+    if (role === 'assembler') {
+        const workerRef = doc(db, "workers", userCredential.user.uid);
         const newWorker: Worker = {
-            id: updatedFirebaseUser.uid,
+            id: userCredential.user.uid,
             name: fullName,
             email: email,
             skills: ['New Recruit'],
