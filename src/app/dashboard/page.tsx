@@ -154,7 +154,13 @@ export default function Dashboard() {
     };
   }, [projects]);
   
-  const recentAssemblers = useMemo(() => workers.slice(0, 4), [workers]);
+  const recentAssemblers = useMemo(() => {
+    // Show workers who have logged time, sorted by most time logged, limited to 4
+    return workers
+      .filter(worker => worker.timeLoggedSeconds > 0)
+      .sort((a, b) => b.timeLoggedSeconds - a.timeLoggedSeconds)
+      .slice(0, 4);
+  }, [workers]);
   
   // Assembler-specific data
   const currentWorker = useMemo(() => {
@@ -472,7 +478,7 @@ export default function Dashboard() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Assembler</TableHead>
-                  <TableHead>Skills</TableHead>
+                  <TableHead>Time Logged</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -494,7 +500,7 @@ export default function Dashboard() {
                         </div>
                     </TableCell>
                     <TableCell>
-                        {worker.skills.join(', ')}
+                        {(worker.timeLoggedSeconds / 3600).toFixed(1)}h
                     </TableCell>
                     </TableRow>
                 ))}

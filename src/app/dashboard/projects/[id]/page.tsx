@@ -254,7 +254,6 @@ export default function ProjectDetailPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Component</TableHead>
-                    <TableHead>Available Processes</TableHead>
                     <TableHead>Required</TableHead>
                     <TableHead>Completed</TableHead>
                     <TableHead>Progress</TableHead>
@@ -270,19 +269,6 @@ export default function ProjectDetailPage() {
                     return (
                       <TableRow key={component.id}>
                         <TableCell className="font-medium">{component.name}</TableCell>
-                        <TableCell>
-                          {component.availableProcesses && component.availableProcesses.length > 0 ? (
-                            <div className="flex flex-wrap gap-1">
-                              {component.availableProcesses.map((process: string, index: number) => (
-                                <Badge key={index} variant="secondary" className="text-xs">
-                                  {process}
-                                </Badge>
-                              ))}
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">No processes defined</span>
-                          )}
-                        </TableCell>
                         <TableCell>{component.quantityRequired.toLocaleString()}</TableCell>
                         <TableCell>{component.quantityCompleted.toLocaleString()}</TableCell>
                         <TableCell>
