@@ -43,16 +43,22 @@ npm run deploy:check
 In Vercel Dashboard → Project Settings → Environment Variables, add each variable individually:
 
 **Required Variables:**
+
+**🌐 Client-Side Variables (NEXT_PUBLIC_ - Safe to expose):**
 | Name | Value | Environment |
 |------|-------|-------------|
-| `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` | Production, Preview, Development |
-| `NODE_ENV` | `production` | Production |
+| `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` | All |
 | `NEXT_PUBLIC_FIREBASE_API_KEY` | Your Firebase API key | All |
 | `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` | All |
 | `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Your Firebase project ID | All |
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `your-project.appspot.com` | All |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Your sender ID | All |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Your Firebase app ID | All |
+
+**🔒 Server-Side Variables (Keep private - NO NEXT_PUBLIC_):**
+| Name | Value | Environment |
+|------|-------|-------------|
+| `NODE_ENV` | `production` | Production |
 | `EMAIL_PROVIDER` | `smtp` | All |
 | `SMTP_HOST` | `smtp.gmail.com` | All |
 | `SMTP_PORT` | `587` | All |
@@ -67,10 +73,15 @@ In Vercel Dashboard → Project Settings → Environment Variables, add each var
 |------|-------|-------------|
 | `GEMINI_API_KEY` | Your Gemini API key | All |
 
-**Important Notes:**
+**🔐 Security Notes:**
+- **NEXT_PUBLIC_ variables are SAFE**: Firebase client config is designed to be public
+- **Your security comes from Firestore rules**, not hiding the API key
+- **NEVER add NEXT_PUBLIC_ to**: SMTP passwords, API keys, or secrets
 - Set `NEXT_PUBLIC_APP_URL` to your actual Vercel domain after deployment
 - Use "All Environments" for most variables unless specified
 - For `SMTP_PASS`, use an app-specific password, not your regular email password
+
+**📖 Security Details**: See `docs/security/ENVIRONMENT_SECURITY.md` for complete security guide
 
 #### Step 4: Firebase Setup
 ```bash

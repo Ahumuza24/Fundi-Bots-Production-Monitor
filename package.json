@@ -14,6 +14,8 @@
     "test:smtp": "node scripts/test-smtp.js",
     "test:email": "node scripts/test-smtp.js ahumuzacedric@gmail.com",
     "setup:notifications": "node scripts/setup-notifications.js",
+    "setup:admin": "node scripts/setup-admin.js",
+    "validate:security": "node scripts/validate-security.js",
     "build:analyze": "ANALYZE=true npm run build",
     "deploy:check": "node scripts/deploy-check.js",
     "postbuild": "echo 'Build completed successfully!'"
@@ -50,6 +52,7 @@
     "dotenv": "^16.5.0",
     "embla-carousel-react": "^8.6.0",
     "firebase": "^12.1.0",
+    "firebase-admin": "^13.5.0",
     "genkit": "^1.14.1",
     "jspdf": "^3.0.1",
     "jspdf-autotable": "^5.0.2",

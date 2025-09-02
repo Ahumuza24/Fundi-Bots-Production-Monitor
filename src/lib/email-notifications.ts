@@ -354,57 +354,7 @@ function replaceTemplateVariables(template: string, variables: Record<string, an
   return result;
 }
 
-// SMTP email sending
-async function sendEmailWithSMTP(
-  config: EmailConfig,
-  recipient: EmailRecipient,
-  subject: string,
-  htmlContent: string,
-  textContent: string
-): Promise<boolean> {
-  try {
-    // Only import nodemailer on server side
-    if (typeof window !== 'undefined') {
-      console.log('📧 SMTP email skipped - running in browser');
-      return false;
-    }
 
-    const nodemailer = await import('nodemailer');
-
-    if (!config.smtpHost || !config.smtpUser || !config.smtpPass) {
-      throw new Error('SMTP configuration incomplete');
-    }
-
-    const transporter = nodemailer.default.createTransport({
-      host: config.smtpHost,
-      port: config.smtpPort,
-      secure: config.smtpPort === 465,
-      auth: {
-        user: config.smtpUser,
-        pass: config.smtpPass
-      },
-      // Additional options for Gmail
-      ...(config.smtpHost?.includes('gmail') && {
-        service: 'gmail'
-      })
-    });
-
-    const mailOptions = {
-      from: `${config.fromName} <${config.fromEmail}>`,
-      to: recipient.email,
-      subject,
-      text: textContent,
-      html: htmlContent
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log(`📧 Email sent via SMTP to ${recipient.email}`);
-    return true;
-  } catch (error) {
-    console.error('SMTP email error:', error);
-    return false;
-  }
-}
 
 // Console logging (for development/testing)
 async function logEmailToConsole(

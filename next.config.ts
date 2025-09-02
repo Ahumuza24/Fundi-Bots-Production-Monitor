@@ -30,8 +30,9 @@ const nextConfig: NextConfig = {
   // Performance optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@radix-ui/react-icons'],
-    serverComponentsExternalPackages: ['nodemailer'],
   },
+  // Server external packages (moved from experimental)
+  serverExternalPackages: ['nodemailer'],
   // Vercel-specific optimizations
   poweredByHeader: false,
   compress: true,
