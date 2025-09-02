@@ -32,40 +32,45 @@ npm run deploy:check
    - Import your GitHub repository
 
 2. **Configure Build Settings**
-   - Framework: Next.js
-   - Build Command: `npm run build`
-   - Output Directory: `.next`
-   - Install Command: `npm install`
+   - Framework: Next.js (auto-detected)
+   - Build Command: `npm run build` (auto-detected)
+   - Output Directory: `.next` (auto-detected)
+   - Install Command: `npm install` (auto-detected)
+   
+   **Note**: Vercel should auto-detect these settings. If not, set them manually.
 
 #### Step 3: Environment Variables
-Add these in Vercel Dashboard → Project Settings → Environment Variables:
+In Vercel Dashboard → Project Settings → Environment Variables, add each variable individually:
 
-```env
-# App Configuration
-NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
-NODE_ENV=production
+**Required Variables:**
+| Name | Value | Environment |
+|------|-------|-------------|
+| `NEXT_PUBLIC_APP_URL` | `https://your-app.vercel.app` | Production, Preview, Development |
+| `NODE_ENV` | `production` | Production |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Your Firebase API key | All |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | `your-project.firebaseapp.com` | All |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Your Firebase project ID | All |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | `your-project.appspot.com` | All |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Your sender ID | All |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Your Firebase app ID | All |
+| `EMAIL_PROVIDER` | `smtp` | All |
+| `SMTP_HOST` | `smtp.gmail.com` | All |
+| `SMTP_PORT` | `587` | All |
+| `SMTP_USER` | Your email address | All |
+| `SMTP_PASS` | Your app password | All |
+| `FROM_EMAIL` | Your from email | All |
+| `FROM_NAME` | `FundiFlow` | All |
+| `DEBUG_EMAIL` | `false` | Production |
 
-# Firebase Configuration
-NEXT_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
-NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+**Optional Variables:**
+| Name | Value | Environment |
+|------|-------|-------------|
+| `GEMINI_API_KEY` | Your Gemini API key | All |
 
-# Email Configuration
-EMAIL_PROVIDER=smtp
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_app_password
-FROM_EMAIL=your_email@gmail.com
-FROM_NAME=FundiFlow
-DEBUG_EMAIL=false
-
-# Optional: AI Features
-GEMINI_API_KEY=your_gemini_api_key
-```
+**Important Notes:**
+- Set `NEXT_PUBLIC_APP_URL` to your actual Vercel domain after deployment
+- Use "All Environments" for most variables unless specified
+- For `SMTP_PASS`, use an app-specific password, not your regular email password
 
 #### Step 4: Firebase Setup
 ```bash
