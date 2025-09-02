@@ -2,13 +2,15 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* Performance optimizations */
+  /* Production optimizations */
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Enable for production builds
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Enable for production builds
   },
+  // Output configuration for Vercel
+  output: 'standalone',
   images: {
     remotePatterns: [
       {
@@ -28,7 +30,11 @@ const nextConfig: NextConfig = {
   // Performance optimizations
   experimental: {
     optimizePackageImports: ['lucide-react', 'recharts', '@radix-ui/react-icons'],
+    serverComponentsExternalPackages: ['nodemailer'],
   },
+  // Vercel-specific optimizations
+  poweredByHeader: false,
+  compress: true,
   // Compiler optimizations (works with both Webpack and Turbopack)
   compiler: {
     removeConsole: process.env.NODE_ENV === 'production',

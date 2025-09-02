@@ -6,15 +6,17 @@
     "dev": "next dev --turbopack --port 8080",
     "dev:webpack": "next dev --port 8080",
     "dev:3000": "next dev --turbopack --port 3000",
-    "genkit:dev": "genkit start -- tsx src/ai/dev.ts",
-    "genkit:watch": "genkit start -- tsx --watch src/ai/dev.ts",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:fix": "next lint --fix",
     "typecheck": "tsc --noEmit",
     "test:smtp": "node scripts/test-smtp.js",
     "test:email": "node scripts/test-smtp.js ahumuzacedric@gmail.com",
-    "setup:notifications": "node scripts/setup-notifications.js"
+    "setup:notifications": "node scripts/setup-notifications.js",
+    "build:analyze": "ANALYZE=true npm run build",
+    "deploy:check": "node scripts/deploy-check.js",
+    "postbuild": "echo 'Build completed successfully!'"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.14.1",
