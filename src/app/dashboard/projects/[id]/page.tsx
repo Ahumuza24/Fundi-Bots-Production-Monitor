@@ -13,6 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
+import { PDFViewer } from "@/components/dashboard/pdf-viewer";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 import {
@@ -229,14 +230,12 @@ export default function ProjectDetailPage() {
                       <div className="font-medium">{formatSafeDate(project.updatedAt)}</div>
                     </div>
                   </div>
-                  {project.documentationUrl && (
+                  {project.documentationUrl && project.documentationUrl !== '#' && (
                     <div>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={project.documentationUrl} target="_blank" rel="noopener noreferrer">
-                          <FileText className="h-4 w-4 mr-2" />
-                          View Documentation
-                        </a>
-                      </Button>
+                      <PDFViewer 
+                        documentationUrl={project.documentationUrl} 
+                        projectName={project.name}
+                      />
                     </div>
                   )}
                 </div>
