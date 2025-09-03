@@ -159,7 +159,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         const durationMin = Math.max(0, (end - start) / 60000);
         const breakMin = (s.breakTimeSeconds || 0) / 60;
         totalMinutes += durationMin;
-        activeMinutes += Math.max(0, durationMin - breakMin);
+        activeMinutes += Math.max(0, durationMin - Math.min(breakMin, durationMin));
 
         // expected minutes and completed units
         const unitsInSession = Array.isArray(s.completedComponents)
@@ -170,7 +170,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         if (Array.isArray(s.completedComponents)) {
           s.completedComponents.forEach(cc => {
             const stdMin = getStdMinutes(s.projectId, cc.componentId);
-            if ((stdMin ?? null) && cc.quantity) expectedMinutes += stdMin * cc.quantity;
+            expectedMinutes += (stdMin ?? 0) * (cc.quantity ?? 0);
           });
         }
 
@@ -222,7 +222,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
           if (Array.isArray(s.completedComponents)) {
             s.completedComponents.forEach(cc => {
               const stdMin = getStdMinutes(s.projectId, cc.componentId);
-              if ((stdMin ?? null) && cc.quantity) dayExpected += stdMin * cc.quantity;
+              dayExpected += (stdMin ?? 0) * (cc.quantity ?? 0);
             });
           }
           const q = s.qualityRating ? (qualityMap[s.qualityRating] ?? 80) : 80;
@@ -295,8 +295,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         if (Array.isArray(s.completedComponents)) {
           s.completedComponents.forEach(cc => {
             const stdMin = getStdMinutes(s.projectId, cc.componentId);
-            if ((stdMin ?? null) && cc.quantity) expectedMin += stdMin * cc.quantity;
-            units += cc?.quantity || 0;
+            expectedMin += (stdMin ?? 0) * (cc.quantity ?? 0);
           });
         }
 
