@@ -45,9 +45,9 @@ import {
   Pie,
   Cell,
 } from "recharts"
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, query, where, orderBy } from "firebase/firestore";
 import { db } from '@/lib/firebase';
-import type { Project, Worker, MachineUtilization } from '@/lib/types';
+import type { Project, Worker, MachineUtilization, WorkSession } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { format, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from "react-day-picker";
@@ -99,6 +99,7 @@ interface ReportData {
 export default function ReportsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
+  const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [reportType, setReportType] = useState<'daily' | 'weekly' | 'monthly' | 'custom' | 'monitoring'>('weekly');
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
@@ -141,6 +142,28 @@ export default function ReportsPage() {
         break;
     }
   }, [reportType]);
+
+  useEffect(() => {
+    if (!dateRange?.from) return;
+    const from = new Date(dateRange.from);
+    from.setHours(0, 0, 0, 0);
+    const to = new Date(dateRange.to || dateRange.from);
+    to.setHours(23, 59, 59, 999);
+
+    const q = query(
+      collection(db, 'workSessions'),
+      where('startTime', '>=', from),
+      where('startTime', '<=', to),
+      orderBy('startTime', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const sessions = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as unknown as WorkSession));
+      setWorkSessions(sessions);
+    });
+
+    return () => unsubscribe();
+  }, [dateRange]);
 
   const generateReportData = (): ReportData => {
     const completedProjects = projects.filter(p => p.status === 'Completed');
@@ -243,7 +266,7 @@ export default function ReportsPage() {
     }
   };
 
-  const exportToCSV = (data: any, title: string, format: 'csv' | 'excel') => {
+  const exportToCSV = (data: any, title: string, fileFormat: 'csv' | 'excel') => {
     try {
       // Create CSV content
       const csvContent = [
@@ -289,13 +312,53 @@ export default function ReportsPage() {
         ['Worker Name', 'Skills', 'Availability', 'Performance', 'Time Logged', 'Status'],
         ...workers.map(worker => [
           worker.name,
-          worker.skills.join('; '),
-          worker.availability,
-          `${(worker.pastPerformance * 100).toFixed(1)}%`,
+          (worker.skills || []).join('; '),
+          worker.availability || '',
+          `${((worker.pastPerformance || 0) * 100).toFixed(1)}%`,
           formatTime(worker.timeLoggedSeconds || 0),
           worker.activeProjectId ? 'Active' : 'Inactive'
         ]),
         [] // Empty row
+      );
+    }
+
+    // Add detailed worker performance rows (per session/component) within date range
+    if (workSessions.length > 0) {
+      const findWorker = (id: string) => workers.find(w => w.id === id);
+      const componentName = (componentId: string) => {
+        for (const p of projects) {
+          const c = p.components.find(cc => cc.id === componentId);
+          if (c) return c.name;
+        }
+        return componentId;
+      };
+
+      const detailRows = workSessions.flatMap((ws) => {
+        const start = (ws as any).startTime?.toDate ? (ws as any).startTime.toDate() : new Date(ws.startTime as any);
+        const end = (ws as any).endTime?.toDate ? (ws as any).endTime.toDate() : new Date(ws.endTime as any);
+        const secs = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
+        const worker = findWorker(ws.workerId);
+        const skills = (worker?.skills || []).join('; ');
+        const availability = worker?.availability || '';
+        const dateStr = format(start, 'yyyy-MM-dd');
+
+        return (ws.completedComponents || []).map(cc => [
+          dateStr,
+          worker?.name || ws.workerId,
+          componentName(cc.componentId),
+          cc.quantity ?? 0,
+          ws.process || '',
+          formatTime(secs),
+          skills,
+          availability,
+        ]);
+      }).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+
+      csvContent.push(
+        ['Worker Performance Details'],
+        ['Date', 'Worker', 'Part', 'Quantity', 'Process', 'Time Taken', 'Skills', 'Availability'],
+        ...detailRows,
+        []
       );
     }
 
@@ -395,29 +458,115 @@ export default function ReportsPage() {
         yPosition += 10;
       }
       
-      // Worker Performance as text
-      if (workers.length > 0) {
-        if (yPosition > 200) { // Add new page if needed
-          doc.addPage();
-          yPosition = 20;
-        }
-        
-        doc.setFontSize(14);
-        doc.text('Worker Performance', 20, yPosition);
-        yPosition += 15;
-        
-        doc.setFontSize(10);
-        workers.slice(0, 10).forEach((worker, index) => { // Limit to first 10 workers
-          doc.text(`${index + 1}. ${worker.name} - ${(worker.pastPerformance * 100).toFixed(1)}% efficiency`, 25, yPosition);
-          yPosition += 8;
-          
-          if (yPosition > 270) { // Add new page if needed
+      // Worker Performance Details (grouped by Project) — with clear columns
+      if (workSessions.length > 0) {
+        const findWorker = (id: string) => workers.find(w => w.id === id);
+        const componentName = (componentId: string) => {
+          for (const p of projects) {
+            const c = p.components.find(cc => cc.id === componentId);
+            if (c) return c.name;
+          }
+          return componentId;
+        };
+        const projectName = (projectId: string) => projects.find(p => p.id === projectId)?.name || projectId;
+
+        type Row = { date: string; name: string; project: string; part: string; qty: number; process: string; timeTaken: string };
+        const rows: Row[] = [];
+
+        workSessions.forEach((ws) => {
+          const start = (ws as any).startTime?.toDate ? (ws as any).startTime.toDate() : new Date(ws.startTime as any);
+          const end = (ws as any).endTime?.toDate ? (ws as any).endTime.toDate() : new Date(ws.endTime as any);
+          const secs = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
+          const dateStr = format(start, 'yyyy-MM-dd');
+          const name = findWorker(ws.workerId)?.name || ws.workerId;
+          const proj = projectName(ws.projectId);
+          (ws.completedComponents || []).forEach((cc) => {
+            rows.push({
+              date: dateStr,
+              name,
+              project: proj,
+              part: componentName(cc.componentId),
+              qty: cc.quantity ?? 0,
+              process: ws.process || '',
+              timeTaken: formatTime(secs),
+            });
+          });
+        });
+
+        // Group by project for clearer distinction
+        const groups = rows.reduce<Record<string, Row[]>>((acc, r) => {
+          (acc[r.project] ||= []).push(r);
+          return acc;
+        }, {});
+
+        // Sorting within each project by date then name
+        Object.values(groups).forEach(list => list.sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name)));
+
+        const ensureSpace = (needed: number) => {
+          if (yPosition + needed > 280) {
             doc.addPage();
             yPosition = 20;
           }
+        };
+
+        // Section title
+        ensureSpace(20);
+        doc.setFontSize(14);
+        doc.text('Worker Performance Details', 20, yPosition);
+        yPosition += 10;
+
+        // Column positions
+        const x = { date: 20, name: 45, project: 90, part: 140, qty: 185, process: 205, time: 255 } as const;
+        const widths = { date: 22, name: 40, project: 45, part: 40, qty: 18, process: 45, time: 25 } as const;
+
+        // Render a table header
+        const renderHeader = () => {
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          doc.text('Date', x.date, yPosition);
+          doc.text('Name', x.name, yPosition);
+          doc.text('Project', x.project, yPosition);
+          doc.text('Part', x.part, yPosition);
+          doc.text('Number of parts', x.qty, yPosition);
+          doc.text('Process', x.process, yPosition);
+          doc.text('Time Taken', x.time, yPosition);
+          doc.setFont(undefined, 'normal');
+          yPosition += 6;
+          // Separator line
+          doc.line(20, yPosition, 285, yPosition);
+          yPosition += 4;
+        };
+
+        const truncate = (s: string, max: number) => (s?.length > max ? s.slice(0, Math.max(0, max - 1)) + '…' : s || '');
+
+        // Draw per-project sections
+        Object.keys(groups).sort().forEach((proj) => {
+          ensureSpace(18);
+          doc.setFontSize(12);
+          doc.setFont(undefined, 'bold');
+          doc.text(`Project: ${proj}`, 20, yPosition);
+          doc.setFont(undefined, 'normal');
+          yPosition += 8;
+          renderHeader();
+
+          groups[proj].forEach((r) => {
+            ensureSpace(8);
+            doc.setFontSize(10);
+            doc.text(r.date, x.date, yPosition);
+            doc.text(truncate(r.name, Math.floor(widths.name / 2)), x.name, yPosition);
+            doc.text(truncate(r.project, Math.floor(widths.project / 2)), x.project, yPosition);
+            doc.text(truncate(r.part, Math.floor(widths.part / 2)), x.part, yPosition);
+            doc.text(String(r.qty), x.qty, yPosition);
+            doc.text(truncate(r.process, Math.floor(widths.process / 2)), x.process, yPosition);
+            doc.text(r.timeTaken, x.time, yPosition);
+            yPosition += 6;
+          });
+
+          // Space after each project
+          yPosition += 4;
         });
       }
-    
+
       // Machine Utilization (for monitoring reports)
       if (reportType === 'monitoring') {
         if (yPosition > 200) { // Add new page if needed
@@ -473,9 +622,10 @@ export default function ReportsPage() {
         ];
         
         const csvString = csvContent.map(row => 
-          row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+          row.map(cell => `"${String(cell || '').replace(/"/g, '""')}"`).join(',')
         ).join('\n');
-        
+
+        // Create and download file
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
@@ -486,6 +636,7 @@ export default function ReportsPage() {
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
+        
       } else if (format === 'json') {
         const jsonData = {
           chartName,
@@ -1130,7 +1281,7 @@ export default function ReportsPage() {
                     <XAxis dataKey="week" />
                     <YAxis />
                     <Tooltip />
-                    <Bar dataKey="parts" fill="#f58220" name="Parts Produced" />
+                    <Bar dataKey="parts" fill="#f58220" />
                   </BarChart>
                 </ResponsiveContainer>
               </CardContent>
