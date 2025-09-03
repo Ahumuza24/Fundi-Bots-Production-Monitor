@@ -516,24 +516,35 @@ export default function ReportsPage() {
         yPosition += 10;
 
         // Column positions
-        const x = { date: 20, name: 45, project: 90, part: 140, qty: 185, process: 205, time: 255 } as const;
-        const widths = { date: 22, name: 40, project: 45, part: 40, qty: 18, process: 45, time: 25 } as const;
+        const pageWidth = (doc as any).internal.pageSize.getWidth();
+        const leftMargin = 15;
+        const rightMargin = 15;
+        const x = {
+          date: leftMargin,
+          name: leftMargin + 22,
+          project: leftMargin + 52,
+          part: leftMargin + 87,
+          qty: leftMargin + 122,
+          process: leftMargin + 140,
+          time: Math.min(pageWidth - rightMargin - 20, leftMargin + 175),
+        } as const;
+        const widths = { date: 20, name: 28, project: 32, part: 32, qty: 16, process: 32, time: 20 } as const;
 
         // Render a table header
         const renderHeader = () => {
-          doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
+          doc.setFontSize(10);
+          doc.setFont('helvetica', 'bold');
           doc.text('Date', x.date, yPosition);
           doc.text('Name', x.name, yPosition);
           doc.text('Project', x.project, yPosition);
           doc.text('Part', x.part, yPosition);
-          doc.text('Number of parts', x.qty, yPosition);
+          doc.text('Number', x.qty, yPosition);
           doc.text('Process', x.process, yPosition);
           doc.text('Time Taken', x.time, yPosition);
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           yPosition += 6;
           // Separator line
-          doc.line(20, yPosition, 285, yPosition);
+          doc.line(leftMargin, yPosition, pageWidth - rightMargin, yPosition);
           yPosition += 4;
         };
 
@@ -543,21 +554,21 @@ export default function ReportsPage() {
         Object.keys(groups).sort().forEach((proj) => {
           ensureSpace(18);
           doc.setFontSize(12);
-          doc.setFont(undefined, 'bold');
+          doc.setFont('helvetica', 'bold');
           doc.text(`Project: ${proj}`, 20, yPosition);
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           yPosition += 8;
           renderHeader();
 
           groups[proj].forEach((r) => {
             ensureSpace(8);
-            doc.setFontSize(10);
+            doc.setFontSize(9);
             doc.text(r.date, x.date, yPosition);
-            doc.text(truncate(r.name, Math.floor(widths.name / 2)), x.name, yPosition);
-            doc.text(truncate(r.project, Math.floor(widths.project / 2)), x.project, yPosition);
-            doc.text(truncate(r.part, Math.floor(widths.part / 2)), x.part, yPosition);
+            doc.text(truncate(r.name, 18), x.name, yPosition);
+            doc.text(truncate(r.project, 18), x.project, yPosition);
+            doc.text(truncate(r.part, 18), x.part, yPosition);
             doc.text(String(r.qty), x.qty, yPosition);
-            doc.text(truncate(r.process, Math.floor(widths.process / 2)), x.process, yPosition);
+            doc.text(truncate(r.process, 18), x.process, yPosition);
             doc.text(r.timeTaken, x.time, yPosition);
             yPosition += 6;
           });
