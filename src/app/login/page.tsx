@@ -42,7 +42,7 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
-  
+
   const handleGuestLogin = () => {
     loginAsGuest();
     router.push('/dashboard');
@@ -73,16 +73,16 @@ export default function LoginPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                required 
+              <Input
+                id="password"
+                type="password"
+                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={isLoading}
               />
             </div>
-             <div className="text-center text-sm">
+            <div className="text-center text-sm">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="underline">
                 Sign up
@@ -93,9 +93,6 @@ export default function LoginPage() {
             <Button className="w-full" type="submit" disabled={isLoading}>
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Sign in
-            </Button>
-            <Button variant="outline" className="w-full" onClick={handleGuestLogin} type="button" disabled={isLoading}>
-              Continue as Guest
             </Button>
           </CardFooter>
         </form>
