@@ -47,9 +47,9 @@ import {
 } from "recharts";
 import { TrendingUp, Award, Clock, Target, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { collection, onSnapshot } from "firebase/firestore";
+import { collection, onSnapshot, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import type { Worker, Project } from "@/lib/types";
+import type { Worker, Project, WorkSession } from "@/lib/types";
 import { subDays, format } from "date-fns";
 
 interface PerformanceData {
@@ -59,6 +59,7 @@ interface PerformanceData {
   productivity: number;
   qualityScore: number;
   timeLogged: number;
+  timeLoggedSeconds: number;
   projectsCompleted: number;
   averageTaskTime: number;
   improvementTrend: number;
@@ -75,40 +76,157 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
+  const [workSessions, setWorkSessions] = useState<WorkSession[]>([]);
 
   useEffect(() => {
     if (open) {
       const workersUnsubscribe = onSnapshot(collection(db, "workers"), (snapshot) => {
         const workersData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Worker));
         setWorkers(workersData);
-        setLoading(false);
       });
 
       const projectsUnsubscribe = onSnapshot(collection(db, "projects"), (snapshot) => {
         const projectsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Project));
         setProjects(projectsData);
-        setLoading(false);
+      });
+
+      const workSessionsUnsubscribe = onSnapshot(collection(db, "workSessions"), (snapshot) => {
+        const sessionsData = snapshot.docs.map(doc => {
+          const d = doc.data() as any;
+          const startTime: Date = d.startTime instanceof Timestamp ? d.startTime.toDate() : new Date(d.startTime);
+          const endTime: Date | undefined = d.endTime ? (d.endTime instanceof Timestamp ? d.endTime.toDate() : new Date(d.endTime)) : undefined;
+          return {
+            id: doc.id,
+            workerId: d.workerId,
+            projectId: d.projectId,
+            componentId: d.componentId,
+            process: d.process,
+            startTime,
+            endTime,
+            completedComponents: Array.isArray(d.completedComponents) ? d.completedComponents : [],
+            qualityRating: d.qualityRating,
+            notes: d.notes,
+            breakTimeSeconds: typeof d.breakTimeSeconds === 'number' ? d.breakTimeSeconds : 0,
+          } as WorkSession;
+        });
+        setWorkSessions(sessionsData);
       });
 
       return () => {
         workersUnsubscribe();
         projectsUnsubscribe();
+        workSessionsUnsubscribe();
       };
     }
   }, [open]);
 
+  useEffect(() => {
+    if (open) {
+      if (workers.length >= 0 && projects.length >= 0 && workSessions.length >= 0) {
+        setLoading(false);
+      }
+    }
+  }, [open, workers.length, projects.length, workSessions.length]);
+
   const calculatePerformanceData = (): PerformanceData[] => {
+    const getStdMinutes = (projectId: string, componentId?: string): number | null => {
+      if (!componentId) return null;
+      const proj = projects.find(p => p.id === projectId);
+      const comp = proj?.components?.find(c => c.id === componentId);
+      return comp?.estimatedTimePerUnit ?? null;
+    };
+
+    const lastNDays = 30;
+    const fromDate = subDays(new Date(), lastNDays);
+
     return workers.map(worker => {
       const workerProjects = projects.filter(p => p.assignedWorkerIds?.includes(worker.id));
       const completedProjects = workerProjects.filter(p => p.status === 'Completed');
-      
-      // Calculate real performance metrics from work session data
-      const efficiency = (worker.pastPerformance || 0) * 100;
-      const productivity = efficiency; // Will be calculated from actual work sessions
-      const qualityScore = efficiency; // Will be calculated from actual work quality metrics
-      const timeLogged = (worker.timeLoggedSeconds || 0) / 3600;
-      const averageTaskTime = timeLogged > 0 ? timeLogged / Math.max(completedProjects.length, 1) : 0;
-      const improvementTrend = 0; // Will be calculated from historical performance data
+
+      const sessions = workSessions.filter(s => s.workerId === worker.id && s.startTime >= fromDate);
+
+      let activeMinutes = 0;
+      let totalMinutes = 0;
+      let expectedMinutes = 0;
+      let totalCompletedUnits = 0;
+      let qualityWeighted = 0;
+      let qualityWeight = 0;
+
+      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 60, Defective: 30 };
+
+      sessions.forEach(s => {
+        const start = s.startTime.getTime();
+        const end = (s.endTime ? s.endTime : new Date()).getTime();
+        const durationMin = Math.max(0, (end - start) / 60000);
+        const breakMin = (s.breakTimeSeconds || 0) / 60;
+        totalMinutes += durationMin;
+        activeMinutes += Math.max(0, durationMin - breakMin);
+
+        const unitsInSession = Array.isArray(s.completedComponents)
+          ? s.completedComponents.reduce((acc, cc) => acc + (cc?.quantity || 0), 0)
+          : 0;
+        totalCompletedUnits += unitsInSession;
+
+        if (Array.isArray(s.completedComponents)) {
+          s.completedComponents.forEach(cc => {
+            const stdMin = getStdMinutes(s.projectId, cc.componentId);
+            if (stdMin && cc.quantity) expectedMinutes += stdMin * cc.quantity;
+          });
+        }
+
+        const sessionQuality = s.qualityRating ? (qualityMap[s.qualityRating] ?? 60) : 60;
+        const weight = unitsInSession > 0 ? unitsInSession : 1;
+        qualityWeighted += sessionQuality * weight;
+        qualityWeight += weight;
+      });
+
+      const efficiency = activeMinutes > 0 && expectedMinutes > 0
+        ? Math.min(150, (expectedMinutes / activeMinutes) * 100)
+        : 0;
+
+      const productivity = totalMinutes > 0
+        ? Math.max(0, Math.min(100, (activeMinutes / totalMinutes) * 100))
+        : 0;
+
+      const qualityScore = qualityWeight > 0 ? (qualityWeighted / qualityWeight) : 0;
+
+      const timeLogged = activeMinutes / 60;
+      const timeLoggedSeconds = Math.round(activeMinutes * 60);
+
+      const averageTaskTime = totalCompletedUnits > 0 ? (activeMinutes / 60) / totalCompletedUnits : 0;
+
+      const last7 = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i));
+      const dailyEff: number[] = last7.map(day => {
+        const dayStart = new Date(day);
+        dayStart.setHours(0, 0, 0, 0);
+        const dayEnd = new Date(day);
+        dayEnd.setHours(23, 59, 59, 999);
+
+        let dayActive = 0;
+        let dayExpected = 0;
+
+        sessions.forEach(s => {
+          const sStart = s.startTime;
+          const sEnd = s.endTime ?? new Date();
+          if (sEnd < dayStart || sStart > dayEnd) return;
+          const start = Math.max(sStart.getTime(), dayStart.getTime());
+          const end = Math.min(sEnd.getTime(), dayEnd.getTime());
+          const durationMin = Math.max(0, (end - start) / 60000);
+          const breakMin = (s.breakTimeSeconds || 0) / 60;
+          dayActive += Math.max(0, durationMin - Math.min(breakMin, durationMin));
+
+          if (Array.isArray(s.completedComponents)) {
+            s.completedComponents.forEach(cc => {
+              const stdMin = getStdMinutes(s.projectId, cc.componentId);
+              if (stdMin && cc.quantity) dayExpected += stdMin * cc.quantity;
+            });
+          }
+        });
+
+        return dayActive > 0 && dayExpected > 0 ? Math.min(150, (dayExpected / dayActive) * 100) : 0;
+      });
+
+      const improvementTrend = dailyEff.length > 1 ? (dailyEff[dailyEff.length - 1] - dailyEff[0]) : 0;
 
       return {
         workerId: worker.id,
@@ -117,6 +235,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         productivity,
         qualityScore,
         timeLogged,
+        timeLoggedSeconds,
         projectsCompleted: completedProjects.length,
         averageTaskTime,
         improvementTrend,
@@ -125,20 +244,80 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
   };
 
   const performanceData = calculatePerformanceData();
-  
-  // Generate trend data from actual work sessions for the selected worker
+
   const generateTrendData = (workerId: string) => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), 6 - i);
-      const basePerformance = performanceData.find(p => p.workerId === workerId)?.efficiency || 0;
+    const sessions = workSessions.filter(s => s.workerId === workerId);
+    const days = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i));
+    const getStdMinutes = (projectId: string, componentId?: string): number | null => {
+      if (!componentId) return null;
+      const proj = projects.find(p => p.id === projectId);
+      const comp = proj?.components?.find(c => c.id === componentId);
+      return comp?.estimatedTimePerUnit ?? null;
+    };
+
+    return days.map(date => {
+      const dayStart = new Date(date);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(date);
+      dayEnd.setHours(23, 59, 59, 999);
+
+      let activeMin = 0;
+      let totalMin = 0;
+      let expectedMin = 0;
+      let qualityWeighted = 0;
+      let qualityWeight = 0;
+      let units = 0;
+
+      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 60, Defective: 30 };
+
+      sessions.forEach(s => {
+        const sStart = s.startTime;
+        const sEnd = s.endTime ?? new Date();
+        if (sEnd < dayStart || sStart > dayEnd) return;
+        const start = Math.max(sStart.getTime(), dayStart.getTime());
+        const end = Math.min(sEnd.getTime(), dayEnd.getTime());
+        const durationMin = Math.max(0, (end - start) / 60000);
+        const breakMin = (s.breakTimeSeconds || 0) / 60;
+        totalMin += durationMin;
+        activeMin += Math.max(0, durationMin - Math.min(breakMin, durationMin));
+
+        if (Array.isArray(s.completedComponents)) {
+          s.completedComponents.forEach(cc => {
+            const stdMin = getStdMinutes(s.projectId, cc.componentId);
+            if (stdMin && cc.quantity) expectedMin += stdMin * cc.quantity;
+            units += cc?.quantity || 0;
+          });
+        }
+
+        const q = s.qualityRating ? (qualityMap[s.qualityRating] ?? 60) : 60;
+        const w = (Array.isArray(s.completedComponents) && s.completedComponents.reduce((a, c) => a + (c?.quantity || 0), 0)) || 1;
+        qualityWeighted += q * w;
+        qualityWeight += w;
+      });
+
+      const efficiency = activeMin > 0 && expectedMin > 0 ? Math.min(150, (expectedMin / activeMin) * 100) : 0;
+      const productivity = totalMin > 0 ? Math.max(0, Math.min(100, (activeMin / totalMin) * 100)) : 0;
+      const quality = qualityWeight > 0 ? (qualityWeighted / qualityWeight) : 0;
+
       return {
         date: format(date, 'MMM dd'),
-        efficiency: basePerformance,
-        productivity: basePerformance,
-        quality: basePerformance,
+        efficiency,
+        productivity,
+        quality,
       };
     });
   };
+
+  const selectedWorkerData = selectedWorker ? performanceData.find(p => p.workerId === selectedWorker) : null;
+  const trendData = selectedWorker ? generateTrendData(selectedWorker) : [];
+
+  const radarData = selectedWorkerData ? [
+    { metric: 'Efficiency', value: selectedWorkerData.efficiency, fullMark: 100 },
+    { metric: 'Productivity', value: selectedWorkerData.productivity, fullMark: 100 },
+    { metric: 'Quality', value: selectedWorkerData.qualityScore, fullMark: 100 },
+    { metric: 'Consistency', value: Math.max(100 - Math.abs(selectedWorkerData.improvementTrend * 5), 60), fullMark: 100 },
+    { metric: 'Speed', value: Math.max(100 - selectedWorkerData.averageTaskTime * 10, 60), fullMark: 100 },
+  ] : [];
 
   const getPerformanceColor = (score: number) => {
     if (score >= 90) return 'bg-green-100 text-green-800';
@@ -157,20 +336,16 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
   const getTrendIcon = (trend: number) => {
     if (trend > 5) return <TrendingUp className="h-4 w-4 text-green-600" />;
     if (trend < -5) return <TrendingUp className="h-4 w-4 text-red-600 rotate-180" />;
-    return <div className="h-4 w-4" />; // neutral
+    return <div className="h-4 w-4" />;
   };
 
-  const selectedWorkerData = selectedWorker ? performanceData.find(p => p.workerId === selectedWorker) : null;
-  const trendData = selectedWorker ? generateTrendData(selectedWorker) : [];
-
-  // Radar chart data for selected worker
-  const radarData = selectedWorkerData ? [
-    { metric: 'Efficiency', value: selectedWorkerData.efficiency, fullMark: 100 },
-    { metric: 'Productivity', value: selectedWorkerData.productivity, fullMark: 100 },
-    { metric: 'Quality', value: selectedWorkerData.qualityScore, fullMark: 100 },
-    { metric: 'Consistency', value: Math.max(100 - Math.abs(selectedWorkerData.improvementTrend * 5), 60), fullMark: 100 },
-    { metric: 'Speed', value: Math.max(100 - selectedWorkerData.averageTaskTime * 10, 60), fullMark: 100 },
-  ] : [];
+  const formatDuration = (totalSeconds: number): string => {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = Math.floor(totalSeconds % 60);
+    const sStr = secs.toString().padStart(2, '0');
+    return `${hrs}h ${mins}m ${sStr}s`;
+  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -199,9 +374,8 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
               <TabsTrigger value="individual">Individual Analysis</TabsTrigger>
               <TabsTrigger value="trends">Performance Trends</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="overview" className="space-y-6">
-              {/* Performance Summary Cards */}
               <div className="grid gap-4 md:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -210,12 +384,12 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {(performanceData.reduce((sum, p) => sum + p.efficiency, 0) / performanceData.length).toFixed(1)}%
+                      {performanceData.length > 0 ? (performanceData.reduce((sum, p) => sum + p.efficiency, 0) / performanceData.length).toFixed(1) : "0.0"}%
                     </div>
                     <p className="text-xs text-muted-foreground">Overall efficiency</p>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Top Performer</CardTitle>
@@ -223,14 +397,14 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {performanceData.sort((a, b) => b.efficiency - a.efficiency)[0]?.workerName.split(' ')[0] || 'N/A'}
+                      {performanceData.length > 0 ? performanceData.slice().sort((a, b) => b.efficiency - a.efficiency)[0]?.workerName.split(' ')[0] : 'N/A'}
                     </div>
                     <p className="text-xs text-muted-foreground">
-                      {performanceData.sort((a, b) => b.efficiency - a.efficiency)[0]?.efficiency.toFixed(1)}% efficiency
+                      {performanceData.length > 0 ? performanceData.slice().sort((a, b) => b.efficiency - a.efficiency)[0]?.efficiency.toFixed(1) : '0.0'}% efficiency
                     </p>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
@@ -238,12 +412,19 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {performanceData.reduce((sum, p) => sum + p.timeLogged, 0).toFixed(0)}h
+                      {performanceData.length > 0
+                        ? formatDuration(
+                            performanceData.reduce(
+                              (sum, p) => sum + (p.timeLoggedSeconds ?? Math.round((p.timeLogged || 0) * 3600)),
+                              0
+                            )
+                          )
+                        : '0h 00m 00s'}
                     </div>
                     <p className="text-xs text-muted-foreground">This period</p>
                   </CardContent>
                 </Card>
-                
+
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">Projects Done</CardTitle>
@@ -251,14 +432,13 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                   </CardHeader>
                   <CardContent>
                     <div className="text-2xl font-bold">
-                      {performanceData.reduce((sum, p) => sum + p.projectsCompleted, 0)}
+                      {performanceData.length > 0 ? performanceData.reduce((sum, p) => sum + p.projectsCompleted, 0) : 0}
                     </div>
                     <p className="text-xs text-muted-foreground">Completed projects</p>
                   </CardContent>
                 </Card>
               </div>
 
-              {/* Performance Table */}
               <Card>
                 <CardHeader>
                   <CardTitle>Individual Performance Metrics</CardTitle>
@@ -280,7 +460,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                     </TableHeader>
                     <TableBody>
                       {performanceData.map((worker) => (
-                        <TableRow 
+                        <TableRow
                           key={worker.workerId}
                           className="cursor-pointer hover:bg-muted/50"
                           onClick={() => setSelectedWorker(worker.workerId)}
@@ -318,7 +498,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                               <span className="text-sm">{worker.qualityScore.toFixed(0)}%</span>
                             </div>
                           </TableCell>
-                          <TableCell>{worker.timeLogged.toFixed(1)}h</TableCell>
+                          <TableCell>{formatDuration(worker.timeLoggedSeconds)}</TableCell>
                           <TableCell>{worker.projectsCompleted}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
@@ -327,8 +507,8 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge 
-                              variant="outline" 
+                            <Badge
+                              variant="outline"
                               className={getPerformanceColor((worker.efficiency + worker.productivity + worker.qualityScore) / 3)}
                             >
                               {getPerformanceLabel((worker.efficiency + worker.productivity + worker.qualityScore) / 3)}
@@ -341,11 +521,10 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                 </CardContent>
               </Card>
             </TabsContent>
-            
+
             <TabsContent value="individual" className="space-y-6">
               {selectedWorkerData ? (
                 <div className="grid gap-6 lg:grid-cols-2">
-                  {/* Worker Details */}
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-3">
@@ -374,7 +553,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                           <p className="text-xs text-muted-foreground">Projects Completed</p>
                         </div>
                         <div>
-                          <div className="text-2xl font-bold">{selectedWorkerData.timeLogged.toFixed(0)}h</div>
+                          <div className="text-2xl font-bold">{formatDuration(selectedWorkerData.timeLoggedSeconds)}</div>
                           <p className="text-xs text-muted-foreground">Hours Logged</p>
                         </div>
                         <div>
@@ -385,7 +564,6 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                     </CardContent>
                   </Card>
 
-                  {/* Radar Chart */}
                   <Card>
                     <CardHeader>
                       <CardTitle>Performance Radar</CardTitle>
@@ -421,7 +599,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                 </Card>
               )}
             </TabsContent>
-            
+
             <TabsContent value="trends" className="space-y-6">
               {selectedWorkerData ? (
                 <Card>
@@ -436,24 +614,24 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                         <XAxis dataKey="date" />
                         <YAxis />
                         <Tooltip />
-                        <Line 
-                          type="monotone" 
-                          dataKey="efficiency" 
-                          stroke="hsl(var(--primary))" 
+                        <Line
+                          type="monotone"
+                          dataKey="efficiency"
+                          stroke="hsl(var(--primary))"
                           strokeWidth={2}
                           name="Efficiency"
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="productivity" 
-                          stroke="#ff7300" 
+                        <Line
+                          type="monotone"
+                          dataKey="productivity"
+                          stroke="#ff7300"
                           strokeWidth={2}
                           name="Productivity"
                         />
-                        <Line 
-                          type="monotone" 
-                          dataKey="quality" 
-                          stroke="#00C49F" 
+                        <Line
+                          type="monotone"
+                          dataKey="quality"
+                          stroke="#00C49F"
                           strokeWidth={2}
                           name="Quality"
                         />
