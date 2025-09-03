@@ -228,6 +228,12 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
 
       const improvementTrend = dailyEff.length > 1 ? (dailyEff[dailyEff.length - 1] - dailyEff[0]) : 0;
 
+      const projectIds = new Set<string>(sessions.map(s => s.projectId));
+      if (worker.activeProjectId) {
+        projectIds.add(worker.activeProjectId);
+      }
+      const projectsWorkedOn = projectIds.size;
+
       return {
         workerId: worker.id,
         workerName: worker.name,
@@ -239,6 +245,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         projectsCompleted: completedProjects.length,
         averageTaskTime,
         improvementTrend,
+        projectsWorkedOn,
       };
     });
   };
@@ -453,7 +460,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                         <TableHead>Productivity</TableHead>
                         <TableHead>Quality Score</TableHead>
                         <TableHead>Hours Logged</TableHead>
-                        <TableHead>Projects</TableHead>
+                        <TableHead>Projects </TableHead>
                         <TableHead>Trend</TableHead>
                         <TableHead>Overall</TableHead>
                       </TableRow>
@@ -499,7 +506,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
                             </div>
                           </TableCell>
                           <TableCell>{formatDuration(worker.timeLoggedSeconds)}</TableCell>
-                          <TableCell>{worker.projectsCompleted}</TableCell>
+                          <TableCell>{worker.projectsWorkedOn}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-1">
                               {getTrendIcon(worker.improvementTrend)}
