@@ -245,7 +245,7 @@ export default function ReportsPage() {
       await new Promise(resolve => setTimeout(resolve, 500));
       
       if (format === 'csv' || format === 'excel') {
-        exportToCSV(data, reportTitle, format);
+        await exportToCSV(data, reportTitle, format);
       } else if (format === 'pdf') {
         await exportToPDF(data, reportTitle);
       }
@@ -266,7 +266,7 @@ export default function ReportsPage() {
     }
   };
 
-  const exportToCSV = (data: any, title: string, fileFormat: 'csv' | 'excel') => {
+  const exportToCSV = async (data: any, title: string, fileFormat: 'csv' | 'excel') => {
     try {
       // Create CSV content
       const csvContent = [
@@ -305,22 +305,7 @@ export default function ReportsPage() {
       );
     }
 
-    // Add worker data if available
-    if (workers.length > 0) {
-      csvContent.push(
-        ['Worker Performance'],
-        ['Worker Name', 'Skills', 'Availability', 'Performance', 'Time Logged', 'Status'],
-        ...workers.map(worker => [
-          worker.name,
-          (worker.skills || []).join('; '),
-          worker.availability || '',
-          `${((worker.pastPerformance || 0) * 100).toFixed(1)}%`,
-          formatTime(worker.timeLoggedSeconds || 0),
-          worker.activeProjectId ? 'Active' : 'Inactive'
-        ]),
-        [] // Empty row
-      );
-    }
+   
 
     // Add detailed worker performance rows (per session/component) within date range
     if (workSessions.length > 0) {
@@ -338,8 +323,6 @@ export default function ReportsPage() {
         const end = (ws as any).endTime?.toDate ? (ws as any).endTime.toDate() : new Date(ws.endTime as any);
         const secs = Math.max(0, Math.round((end.getTime() - start.getTime()) / 1000));
         const worker = findWorker(ws.workerId);
-        const skills = (worker?.skills || []).join('; ');
-        const availability = worker?.availability || '';
         const dateStr = format(start, 'yyyy-MM-dd');
 
         return (ws.completedComponents || []).map(cc => [
@@ -349,14 +332,12 @@ export default function ReportsPage() {
           cc.quantity ?? 0,
           ws.process || '',
           formatTime(secs),
-          skills,
-          availability,
-        ]);
+            ]);
       }).sort((a, b) => String(a[0]).localeCompare(String(b[0])));
 
       csvContent.push(
         ['Worker Performance Details'],
-        ['Date', 'Worker', 'Part', 'Quantity', 'Process', 'Time Taken', 'Skills', 'Availability'],
+        ['Date', 'Worker', 'Part', 'Quantity', 'Process', 'Time Taken'],
         ...detailRows,
         []
       );
@@ -384,16 +365,36 @@ export default function ReportsPage() {
       ).join('\n');
 
       // Create and download file
-      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-      const link = document.createElement('a');
-      const url = URL.createObjectURL(blob);
-      link.setAttribute('href', url);
-      link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
-      link.style.visibility = 'hidden';
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      if (fileFormat === 'excel') {
+        // Build real .xlsx using SheetJS
+        const XLSX = await import('xlsx');
+        const ws = XLSX.utils.aoa_to_sheet(csvContent);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Report');
+        const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-excel.xlsx`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        const ext = 'csv';
+        link.setAttribute('href', url);
+        link.setAttribute('download', `${title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-csv.${ext}`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }
       
     } catch (error) {
       console.error('CSV export error:', error);
@@ -538,7 +539,7 @@ export default function ReportsPage() {
           doc.text('Name', x.name, yPosition);
           doc.text('Project', x.project, yPosition);
           doc.text('Part', x.part, yPosition);
-          doc.text('Number', x.qty, yPosition);
+          doc.text('Qty', x.qty, yPosition);
           doc.text('Process', x.process, yPosition);
           doc.text('Time Taken', x.time, yPosition);
           doc.setFont('helvetica', 'normal');
@@ -640,8 +641,9 @@ export default function ReportsPage() {
         const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
         const url = URL.createObjectURL(blob);
+        const ext = 'csv';
         link.setAttribute('href', url);
-        link.setAttribute('download', `${chartName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+        link.setAttribute('download', `${chartName.replace(/[^a-z0-9]/gi, '_').toLowerCase()}-${format}.${ext}`);
         link.style.visibility = 'hidden';
         document.body.appendChild(link);
         link.click();
