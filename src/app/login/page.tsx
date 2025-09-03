@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -18,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -52,7 +52,11 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
+          <div className="flex flex-col items-center gap-2">
+            <Image src="/fundi_bots_logo.png" alt="Fundi Bots logo" width={150} height={150} priority />
+            <h1 className="text-l font-semibold text-center">Production Monitor</h1>
+          </div>
+          {/* <CardTitle className="text-2xl">Login</CardTitle> */}
           <CardDescription>
             Enter your email below to login to your account.
           </CardDescription>
@@ -64,7 +68,7 @@ export default function LoginPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="name@fundibots.org"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

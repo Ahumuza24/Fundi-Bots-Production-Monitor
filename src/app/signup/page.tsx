@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -19,6 +18,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
+import Image from 'next/image';
 import type { UserRole } from '@/hooks/use-auth';
 
 export default function SignupPage() {
@@ -51,7 +51,11 @@ export default function SignupPage() {
     <div className="flex items-center justify-center min-h-screen bg-background">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle className="text-2xl">Sign Up</CardTitle>
+          <div className="flex flex-col items-center gap-2">
+            <Image src="/fundi_bots_logo.png" alt="Fundi Bots logo" width={150} height={150} priority />
+            <h1 className="text-l font-semibold text-center">Production Monitor</h1>
+          </div>
+          {/* <CardTitle className="text-2xl">Sign Up</CardTitle> */}
           <CardDescription>
             Create an account to get started.
           </CardDescription>
@@ -63,7 +67,7 @@ export default function SignupPage() {
               <Input
                 id="fullName"
                 type="text"
-                placeholder="John Doe"
+                placeholder="Your Name"
                 required
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -75,7 +79,7 @@ export default function SignupPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder="name@fundibots.org"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
