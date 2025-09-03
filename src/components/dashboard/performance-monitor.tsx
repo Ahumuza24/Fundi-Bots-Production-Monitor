@@ -129,30 +129,29 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
   }, [open, workers.length, projects.length, workSessions.length]);
 
   const calculatePerformanceData = (): PerformanceData[] => {
+    const DEFAULT_STD_MIN = 5; // fallback standard time (minutes) per unit when not specified
     const getStdMinutes = (projectId: string, componentId?: string): number | null => {
       if (!componentId) return null;
       const proj = projects.find(p => p.id === projectId);
       const comp = proj?.components?.find(c => c.id === componentId);
-      return comp?.estimatedTimePerUnit ?? null;
+      return comp?.estimatedTimePerUnit ?? DEFAULT_STD_MIN; // minutes per unit (fallback)
     };
 
-    const lastNDays = 30;
+    const lastNDays = 30; // analysis window
     const fromDate = subDays(new Date(), lastNDays);
 
     return workers.map(worker => {
       const workerProjects = projects.filter(p => p.assignedWorkerIds?.includes(worker.id));
-      const completedProjects = workerProjects.filter(p => p.status === 'Completed');
-
       const sessions = workSessions.filter(s => s.workerId === worker.id && s.startTime >= fromDate);
 
-      let activeMinutes = 0;
-      let totalMinutes = 0;
-      let expectedMinutes = 0;
+      let activeMinutes = 0; // end-start minus breaks
+      let totalMinutes = 0;  // end-start including breaks
+      let expectedMinutes = 0; // sum(quantity * std minutes)
       let totalCompletedUnits = 0;
       let qualityWeighted = 0;
       let qualityWeight = 0;
 
-      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 60, Defective: 30 };
+      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 80, Defective: 40 };
 
       sessions.forEach(s => {
         const start = s.startTime.getTime();
@@ -162,6 +161,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         totalMinutes += durationMin;
         activeMinutes += Math.max(0, durationMin - breakMin);
 
+        // expected minutes and completed units
         const unitsInSession = Array.isArray(s.completedComponents)
           ? s.completedComponents.reduce((acc, cc) => acc + (cc?.quantity || 0), 0)
           : 0;
@@ -170,18 +170,19 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         if (Array.isArray(s.completedComponents)) {
           s.completedComponents.forEach(cc => {
             const stdMin = getStdMinutes(s.projectId, cc.componentId);
-            if (stdMin && cc.quantity) expectedMinutes += stdMin * cc.quantity;
+            if ((stdMin ?? null) && cc.quantity) expectedMinutes += stdMin * cc.quantity;
           });
         }
 
-        const sessionQuality = s.qualityRating ? (qualityMap[s.qualityRating] ?? 60) : 60;
-        const weight = unitsInSession > 0 ? unitsInSession : 1;
+        // quality score weighting
+        const sessionQuality = s.qualityRating ? (qualityMap[s.qualityRating] ?? 80) : 80;
+        const weight = unitsInSession > 0 ? unitsInSession : 1; // weight by output if present
         qualityWeighted += sessionQuality * weight;
         qualityWeight += weight;
       });
 
       const efficiency = activeMinutes > 0 && expectedMinutes > 0
-        ? Math.min(150, (expectedMinutes / activeMinutes) * 100)
+        ? Math.min(150, (expectedMinutes / activeMinutes) * 100) // cap at 150%
         : 0;
 
       const productivity = totalMinutes > 0
@@ -193,18 +194,20 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
       const timeLogged = activeMinutes / 60;
       const timeLoggedSeconds = Math.round(activeMinutes * 60);
 
-      const averageTaskTime = totalCompletedUnits > 0 ? (activeMinutes / 60) / totalCompletedUnits : 0;
+      const averageTaskTime = totalCompletedUnits > 0 ? (activeMinutes / 60) / totalCompletedUnits : 0; // hours per unit
 
+      // 7-day overall trend: change in average of (efficiency, productivity, quality) from first to last day
       const last7 = Array.from({ length: 7 }, (_, i) => subDays(new Date(), 6 - i));
-      const dailyEff: number[] = last7.map(day => {
+      const dailyScores: { eff: number; prod: number; qual: number; overall: number }[] = last7.map(day => {
         const dayStart = new Date(day);
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(day);
         dayEnd.setHours(23, 59, 59, 999);
-
         let dayActive = 0;
+        let dayTotal = 0;
         let dayExpected = 0;
-
+        let dayQualityWeighted = 0;
+        let dayQualityWeight = 0;
         sessions.forEach(s => {
           const sStart = s.startTime;
           const sEnd = s.endTime ?? new Date();
@@ -212,27 +215,28 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
           const start = Math.max(sStart.getTime(), dayStart.getTime());
           const end = Math.min(sEnd.getTime(), dayEnd.getTime());
           const durationMin = Math.max(0, (end - start) / 60000);
-          const breakMin = (s.breakTimeSeconds || 0) / 60;
-          dayActive += Math.max(0, durationMin - Math.min(breakMin, durationMin));
-
+          const breakMin = (s.breakTimeSeconds || 0) / 60; // approximate within-day break
+          dayTotal += durationMin;
+          const activeMin = Math.max(0, durationMin - Math.min(breakMin, durationMin));
+          dayActive += activeMin;
           if (Array.isArray(s.completedComponents)) {
             s.completedComponents.forEach(cc => {
               const stdMin = getStdMinutes(s.projectId, cc.componentId);
-              if (stdMin && cc.quantity) dayExpected += stdMin * cc.quantity;
+              if ((stdMin ?? null) && cc.quantity) dayExpected += stdMin * cc.quantity;
             });
           }
+          const q = s.qualityRating ? (qualityMap[s.qualityRating] ?? 80) : 80;
+          const w = (Array.isArray(s.completedComponents) && s.completedComponents.reduce((a, c) => a + (c?.quantity || 0), 0)) || 1;
+          dayQualityWeighted += q * w;
+          dayQualityWeight += w;
         });
-
-        return dayActive > 0 && dayExpected > 0 ? Math.min(150, (dayExpected / dayActive) * 100) : 0;
+        const eff = dayActive > 0 && dayExpected > 0 ? Math.min(150, (dayExpected / dayActive) * 100) : 0;
+        const prod = dayTotal > 0 ? Math.max(0, Math.min(100, (dayActive / dayTotal) * 100)) : 0;
+        const qual = dayQualityWeight > 0 ? (dayQualityWeighted / dayQualityWeight) : 0;
+        const overall = (eff + prod + qual) / 3;
+        return { eff, prod, qual, overall };
       });
-
-      const improvementTrend = dailyEff.length > 1 ? (dailyEff[dailyEff.length - 1] - dailyEff[0]) : 0;
-
-      const projectIds = new Set<string>(sessions.map(s => s.projectId));
-      if (worker.activeProjectId) {
-        projectIds.add(worker.activeProjectId);
-      }
-      const projectsWorkedOn = projectIds.size;
+      const improvementTrend = dailyScores.length > 1 ? (dailyScores[dailyScores.length - 1].overall - dailyScores[0].overall) : 0;
 
       return {
         workerId: worker.id,
@@ -242,7 +246,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         qualityScore,
         timeLogged,
         timeLoggedSeconds,
-        projectsCompleted: projectsWorkedOn,
+        projectsCompleted: projects.filter(p => p.status === 'Completed').length,
         averageTaskTime,
         improvementTrend,
       };
@@ -258,7 +262,8 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
       if (!componentId) return null;
       const proj = projects.find(p => p.id === projectId);
       const comp = proj?.components?.find(c => c.id === componentId);
-      return comp?.estimatedTimePerUnit ?? null;
+      const DEFAULT_STD_MIN = 5;
+      return comp?.estimatedTimePerUnit ?? DEFAULT_STD_MIN;
     };
 
     return days.map(date => {
@@ -274,7 +279,7 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
       let qualityWeight = 0;
       let units = 0;
 
-      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 60, Defective: 30 };
+      const qualityMap: Record<string, number> = { Good: 100, 'Needs Rework': 80, Defective: 40 };
 
       sessions.forEach(s => {
         const sStart = s.startTime;
@@ -290,12 +295,12 @@ export function PerformanceMonitor({ onClose }: PerformanceMonitorProps) {
         if (Array.isArray(s.completedComponents)) {
           s.completedComponents.forEach(cc => {
             const stdMin = getStdMinutes(s.projectId, cc.componentId);
-            if (stdMin && cc.quantity) expectedMin += stdMin * cc.quantity;
+            if ((stdMin ?? null) && cc.quantity) expectedMin += stdMin * cc.quantity;
             units += cc?.quantity || 0;
           });
         }
 
-        const q = s.qualityRating ? (qualityMap[s.qualityRating] ?? 60) : 60;
+        const q = s.qualityRating ? (qualityMap[s.qualityRating] ?? 80) : 80;
         const w = (Array.isArray(s.completedComponents) && s.completedComponents.reduce((a, c) => a + (c?.quantity || 0), 0)) || 1;
         qualityWeighted += q * w;
         qualityWeight += w;

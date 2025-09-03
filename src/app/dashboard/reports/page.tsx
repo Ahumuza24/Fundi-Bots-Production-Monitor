@@ -819,7 +819,7 @@ export default function ReportsPage() {
                 <TableHead>Priority</TableHead>
                 <TableHead>Progress</TableHead>
                 <TableHead>Deadline</TableHead>
-                <TableHead>Assigned Workers</TableHead>
+                {/* <TableHead>Assigned Workers</TableHead> */}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -851,7 +851,7 @@ export default function ReportsPage() {
                       project.components.reduce((sum, c) => sum + c.quantityRequired, 0)) * 100 || 0).toFixed(0)}%
                   </TableCell>
                   <TableCell>{format(new Date(project.deadline), 'MMM dd, yyyy')}</TableCell>
-                  <TableCell>{project.assignedWorkerIds?.length || 0} workers</TableCell>
+                  {/* <TableCell>{project.assignedWorkerIds?.length || 0} workers</TableCell> */}
                 </TableRow>
               ))}
             </TableBody>

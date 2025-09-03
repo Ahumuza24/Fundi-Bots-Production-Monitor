@@ -63,6 +63,7 @@ export default function WorkSessionsPage() {
   const [selectedComponentIds, setSelectedComponentIds] = useState<string[]>([]);
   const [selectedProcess, setSelectedProcess] = useState<string>('');
   const [customProcess, setCustomProcess] = useState<string>('');
+  const [defaultProcesses, setDefaultProcesses] = useState<string[]>([]);
   
   // Session state
   const [sessionActive, setSessionActive] = useState(false);
@@ -102,12 +103,27 @@ export default function WorkSessionsPage() {
     return selectedProject.components.filter(c => selectedComponentIds.includes(c.id));
   }, [selectedProject, selectedComponentIds]);
 
-  // Get available processes for selected components
+  // Clean and merge defaults + component processes for selector
+  const cleanedDefaults = useMemo(() => {
+    return Array.from(
+      new Set(
+        (defaultProcesses || [])
+          .map(p => (typeof p === 'string' ? p.trim() : ''))
+          .filter(Boolean)
+      )
+    ).sort((a, b) => a.localeCompare(b));
+  }, [defaultProcesses]);
+
   const availableProcesses = useMemo(() => {
-    if (selectedComponents.length === 0) return [];
-    const allProcesses = selectedComponents.flatMap(c => c.availableProcesses || []);
-    return [...new Set(allProcesses)];
-  }, [selectedComponents]);
+    const componentProcesses = selectedComponents.length === 0
+      ? []
+      : selectedComponents
+          .flatMap(c => c.availableProcesses || [])
+          .map(p => (typeof p === 'string' ? p.trim() : ''))
+          .filter(Boolean);
+    const merged = new Set<string>([...cleanedDefaults, ...componentProcesses]);
+    return Array.from(merged).sort((a, b) => a.localeCompare(b));
+  }, [selectedComponents, cleanedDefaults]);
 
   useEffect(() => {
     if (!user?.uid) return;
@@ -137,43 +153,48 @@ export default function WorkSessionsPage() {
       console.error("Error fetching worker data: ", error);
     });
 
+    // Listen to default processes configured by project lead
+    const processesUnsubscribe = onSnapshot(doc(db, 'settings', 'processes'), (snapshot) => {
+      const data = snapshot.data() as { defaultProcesses?: string[] } | undefined;
+      const list = Array.isArray(data?.defaultProcesses) ? data!.defaultProcesses : [];
+      setDefaultProcesses(list);
+    }, (error) => {
+      console.error('Error fetching default processes: ', error);
+    });
+
     return () => {
       projectsUnsubscribe();
       workerUnsubscribe();
+      processesUnsubscribe();
     };
   }, [toast, user]);
 
+  // Update or create worker doc with active project
   const updateWorkerActiveProject = useCallback(async (projectId?: string | null) => {
-      if (user?.uid && user.role === 'assembler') {
-          const workerRef = doc(db, 'workers', user.uid);
-          try {
-              // First check if the worker document exists
-              const workerDoc = await getDoc(workerRef);
-              
-              if (!workerDoc.exists()) {
-                  // Create the worker document if it doesn't exist
-                  const newWorker = createDefaultWorker(user.uid, projectId);
-                  await setDoc(workerRef, newWorker);
-                  
-                  toast({
-                      title: "Worker Profile Created",
-                      description: "Your worker profile has been created automatically.",
-                  });
-              } else {
-                  // Update existing worker document
-                  await updateDoc(workerRef, { 
-                      activeProjectId: projectId ?? null
-                  });
-              }
-          } catch (error) {
-              console.error("Error updating worker active project: ", error);
-              toast({ 
-                  variant: 'destructive', 
-                  title: "Error", 
-                  description: "Could not update your active project. Please try again."
-              });
-          }
+    if (!user?.uid) return;
+    const workerRef = doc(db, 'workers', user.uid);
+    try {
+      const workerDoc = await getDoc(workerRef);
+      if (!workerDoc.exists()) {
+        const newWorker = createDefaultWorker(user.uid, projectId ?? null);
+        await setDoc(workerRef, newWorker);
+        toast({
+          title: 'Worker Profile Created',
+          description: 'Your worker profile has been created automatically.',
+        });
+      } else {
+        await updateDoc(workerRef, {
+          activeProjectId: projectId ?? null,
+        });
       }
+    } catch (error) {
+      console.error('Error updating worker active project: ', error);
+      toast({
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Could not update your active project. Please try again.',
+      });
+    }
   }, [user, toast, createDefaultWorker]);
 
   // Timer effect
